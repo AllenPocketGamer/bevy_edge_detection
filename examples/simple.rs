@@ -8,7 +8,7 @@ fn main() {
     App::new()
         .add_plugins((DefaultPlugins, EdgeDetectionPlugin))
         .add_systems(Startup, setup)
-        .add_systems(Update, (rotate, update_settings))
+        .add_systems(Update, rotate)
         .run();
 }
 
@@ -33,10 +33,7 @@ fn setup(
         // The edge detection effect requires the normal prepass
         NormalPrepass,
         // The edge detection settings. This component is also used to determine on which camera to run the edge detection post-processing.
-        EdgeDetectionUniform {
-            intensity: 0.02,
-            ..default()
-        },
+        EdgeDetectionUniform::default(),
     ));
 
     // cube
@@ -61,22 +58,5 @@ fn rotate(time: Res<Time>, mut query: Query<&mut Transform, With<Rotates>>) {
     for mut transform in &mut query {
         transform.rotate_x(0.55 * time.delta_secs());
         transform.rotate_z(0.15 * time.delta_secs());
-    }
-}
-
-// Change the intensity over time to show that the effect is controlled from the main world
-fn update_settings(mut settings: Query<&mut EdgeDetectionUniform>, time: Res<Time>) {
-    for mut setting in &mut settings {
-        let mut intensity = ops::sin(time.elapsed_secs());
-        // Make it loop periodically
-        intensity = ops::sin(intensity);
-        // Remap it to 0..1 because the intensity can't be negative
-        intensity = intensity * 0.5 + 0.5;
-        // Scale it to a more reasonable level
-        intensity *= 0.015;
-
-        // Set the intensity.
-        // This will then be extracted to the render world and uploaded to the GPU automatically by the [`UniformComponentPlugin`]
-        setting.intensity = intensity;
     }
 }
