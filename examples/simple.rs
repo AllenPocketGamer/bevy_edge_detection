@@ -3,7 +3,7 @@ use bevy_edge_detection::*;
 
 fn main() {
     App::new()
-        .add_plugins((DefaultPlugins, PostProcessPlugin))
+        .add_plugins((DefaultPlugins, EdgeDetectionPlugin))
         .add_systems(Startup, setup)
         .add_systems(Update, (rotate, update_settings))
         .run();
@@ -25,7 +25,7 @@ fn setup(
         },
         // Add the setting to the camera.
         // This component is also used to determine on which camera to run the post processing effect.
-        PostProcessSettings {
+        EdgeDetectionSettings {
             intensity: 0.02,
             ..default()
         },
@@ -57,7 +57,7 @@ fn rotate(time: Res<Time>, mut query: Query<&mut Transform, With<Rotates>>) {
 }
 
 // Change the intensity over time to show that the effect is controlled from the main world
-fn update_settings(mut settings: Query<&mut PostProcessSettings>, time: Res<Time>) {
+fn update_settings(mut settings: Query<&mut EdgeDetectionSettings>, time: Res<Time>) {
     for mut setting in &mut settings {
         let mut intensity = ops::sin(time.elapsed_secs());
         // Make it loop periodically
