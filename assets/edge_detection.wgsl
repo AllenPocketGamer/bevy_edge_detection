@@ -4,9 +4,9 @@
 @group(0) @binding(1) var texture_sampler: sampler;
 @group(0) @binding(2) var depth_prepass_texture: texture_depth_2d;
 @group(0) @binding(3) var normal_prepass_texture: texture_2d<f32>;
-@group(0) @binding(4) var<uniform> settings: EdgeDetectionSettings;
+@group(0) @binding(4) var<uniform> settings: EdgeDetectionUniform;
 
-struct EdgeDetectionSettings {
+struct EdgeDetectionUniform {
     intensity: f32,
 #ifdef SIXTEEN_BYTE_ALIGNMENT
     // WebGL2 structs must be 16 byte aligned.

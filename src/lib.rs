@@ -23,7 +23,7 @@ use bevy::{
         RenderApp,
     },
 };
-use binding_types::{texture_depth_2d};
+use binding_types::texture_depth_2d;
 
 // TODO: delete it
 const SHADER_ASSET_PATH: &str = "edge_detection.wgsl";
@@ -34,8 +34,8 @@ pub struct EdgeDetectionPlugin;
 impl Plugin for EdgeDetectionPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((
-            ExtractComponentPlugin::<EdgeDetectionSettings>::default(),
-            UniformComponentPlugin::<EdgeDetectionSettings>::default(),
+            ExtractComponentPlugin::<EdgeDetectionUniform>::default(),
+            UniformComponentPlugin::<EdgeDetectionUniform>::default(),
         ));
 
         // We need to get the render app from the main app
@@ -72,17 +72,14 @@ impl ViewNode for EdgeDetectionNode {
     type ViewQuery = (
         &'static ViewTarget,
         &'static ViewPrepassTextures,
-        &'static DynamicUniformIndex<EdgeDetectionSettings>,
-        &'static EdgeDetectionSettings,
+        &'static DynamicUniformIndex<EdgeDetectionUniform>,
     );
 
     fn run(
         &self,
         _graph: &mut RenderGraphContext,
         render_context: &mut RenderContext,
-        (view_target, prepass_textures, settings_index, _edge_detection_settings): QueryItem<
-            Self::ViewQuery,
-        >,
+        (view_target, prepass_textures, uniform_index): QueryItem<Self::ViewQuery>,
         world: &World,
     ) -> Result<(), NodeRunError> {
         let edge_detection_pipeline = world.resource::<EdgeDetectionPipeline>();
@@ -101,8 +98,8 @@ impl ViewNode for EdgeDetectionNode {
             return Ok(());
         };
 
-        let settings_uniforms = world.resource::<ComponentUniforms<EdgeDetectionSettings>>();
-        let Some(settings_binding) = settings_uniforms.uniforms().binding() else {
+        let edge_detection_uniform = world.resource::<ComponentUniforms<EdgeDetectionUniform>>();
+        let Some(uniform_binding) = edge_detection_uniform.uniforms().binding() else {
             return Ok(());
         };
 
@@ -135,8 +132,8 @@ impl ViewNode for EdgeDetectionNode {
                 &depth_texture.texture.default_view,
                 // Use normal prepass
                 &normal_texture.texture.default_view,
-                // Set the settings binding
-                settings_binding.clone(),
+                // Set the uniform binding
+                uniform_binding.clone(),
             )),
         );
 
@@ -153,7 +150,7 @@ impl ViewNode for EdgeDetectionNode {
         });
 
         render_pass.set_render_pipeline(pipeline);
-        render_pass.set_bind_group(0, &bind_group, &[settings_index.index()]);
+        render_pass.set_bind_group(0, &bind_group, &[uniform_index.index()]);
         render_pass.draw(0..3, 0..1);
 
         Ok(())
@@ -187,8 +184,8 @@ impl FromWorld for EdgeDetectionPipeline {
                     texture_depth_2d(),
                     // normal prepass
                     texture_2d(TextureSampleType::Float { filterable: true }),
-                    // The settings uniform that will control the effect
-                    uniform_buffer::<EdgeDetectionSettings>(true),
+                    // The uniform that will control the effect
+                    uniform_buffer::<EdgeDetectionUniform>(true),
                 ),
             ),
         );
@@ -238,7 +235,7 @@ impl FromWorld for EdgeDetectionPipeline {
 
 // This is the component that will get passed to the shader
 #[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType)]
-pub struct EdgeDetectionSettings {
+pub struct EdgeDetectionUniform {
     pub intensity: f32,
     // WebGL2 structs must be 16 byte aligned.
     #[cfg(feature = "webgl2")]

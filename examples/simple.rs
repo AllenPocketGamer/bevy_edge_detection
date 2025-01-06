@@ -33,7 +33,7 @@ fn setup(
         // The edge detection effect requires the normal prepass
         NormalPrepass,
         // The edge detection settings. This component is also used to determine on which camera to run the edge detection post-processing.
-        EdgeDetectionSettings {
+        EdgeDetectionUniform {
             intensity: 0.02,
             ..default()
         },
@@ -65,7 +65,7 @@ fn rotate(time: Res<Time>, mut query: Query<&mut Transform, With<Rotates>>) {
 }
 
 // Change the intensity over time to show that the effect is controlled from the main world
-fn update_settings(mut settings: Query<&mut EdgeDetectionSettings>, time: Res<Time>) {
+fn update_settings(mut settings: Query<&mut EdgeDetectionUniform>, time: Res<Time>) {
     for mut setting in &mut settings {
         let mut intensity = ops::sin(time.elapsed_secs());
         // Make it loop periodically
