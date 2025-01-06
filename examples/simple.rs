@@ -1,4 +1,7 @@
-use bevy::prelude::*;
+use bevy::{
+    core_pipeline::prepass::{DepthPrepass, NormalPrepass},
+    prelude::*,
+};
 use bevy_edge_detection::*;
 
 fn main() {
@@ -23,8 +26,13 @@ fn setup(
             clear_color: Color::WHITE.into(),
             ..default()
         },
-        // Add the setting to the camera.
-        // This component is also used to determine on which camera to run the post processing effect.
+        // TODO: [`EdgeDetectionPlugin`] not support `MSAA` currently.
+        Msaa::Off,
+        // The edge detection effect requires the depth prepass
+        DepthPrepass,
+        // The edge detection effect requires the normal prepass
+        NormalPrepass,
+        // The edge detection settings. This component is also used to determine on which camera to run the edge detection post-processing.
         EdgeDetectionSettings {
             intensity: 0.02,
             ..default()
