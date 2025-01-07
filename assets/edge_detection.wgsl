@@ -11,11 +11,12 @@
 
 struct EdgeDetectionUniform {
     depth_threshold: f32,
-    steep_angle_threshold: f32,
-    steep_angle_multiplier: f32,
     normal_threshold: f32,
     color_threshold: f32,
     edge_color: vec4f,
+
+    steep_angle_threshold: f32,
+    steep_angle_multiplier: f32,
 }
 
 // -----------------------
@@ -125,6 +126,8 @@ fn prepass_normal(pixel_coord: vec2i) -> vec3f {
 
 @fragment
 fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
+    var color = textureSample(screen_texture, texture_sampler, in.uv).rgb;
+
     let pixel_coord = vec2i(in.position.xy);
 
     let ndc = vec3f(uv_to_ndc(in.uv), 1.0);
@@ -134,10 +137,9 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
     let normal = prepass_normal(pixel_coord);
     let NdotV = max(dot(normal, view_direction), 0.001);
 
-    // let color = textureSample(screen_texture, texture_sampler, in.uv).rgb;
-
     let edge_depth = detect_edge_depth(pixel_coord, NdotV);
 
-    // return vec4f(vec3f(1.0 - NdotV), 1.0);
-    return vec4f(vec3f(edge_depth), 1.0);
+    color = mix(color, ed_uniform.edge_color.rgb, edge_depth);
+
+    return vec4f(color, 1.0);
 }
