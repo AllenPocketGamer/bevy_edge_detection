@@ -29,7 +29,19 @@ use binding_types::texture_depth_2d;
 const SHADER_ASSET_PATH: &str = "edge_detection.wgsl";
 
 /// An edge detection post-processing plugin based on the sobel filter.
-pub struct EdgeDetectionPlugin;
+pub struct EdgeDetectionPlugin {
+    pub after: Node3d,
+    pub before: Node3d,
+}
+
+impl Default for EdgeDetectionPlugin {
+    fn default() -> Self {
+        Self {
+            after: Node3d::Tonemapping,
+            before: Node3d::Fxaa,
+        }
+    }
+}
 
 impl Plugin for EdgeDetectionPlugin {
     fn build(&self, app: &mut App) {
@@ -47,11 +59,7 @@ impl Plugin for EdgeDetectionPlugin {
             .add_render_graph_node::<ViewNodeRunner<EdgeDetectionNode>>(Core3d, EdgeDetectionLabel)
             .add_render_graph_edges(
                 Core3d,
-                (
-                    Node3d::Tonemapping,
-                    EdgeDetectionLabel,
-                    Node3d::EndMainPassPostProcessing,
-                ),
+                (self.after.clone(), EdgeDetectionLabel, self.before.clone()),
             );
     }
 
@@ -272,13 +280,13 @@ pub struct EdgeDetectionUniform {
     /// When the angle between the view direction and the surface normal is very steep, the depth gradient
     /// can appear artificially large, causing non-edge regions to be mistakenly detected as edges.
     /// This threshold defines the angle at which the depth threshold adjustment begins to take effect.
-    /// 
+    ///
     /// Range: [0.0, 1.0]
     pub steep_angle_threshold: f32,
     /// Steep angle multiplier, used to scale the depth threshold adjustment for steep angles.
     /// This value amplifies the effect of the steep angle adjustment, ensuring that the depth threshold
     /// is appropriately relaxed in steep-angle regions to avoid false edge detection.
-    /// 
+    ///
     /// Range: [0.0, +inf]
     pub steep_angle_multiplier: f32,
 }
@@ -288,7 +296,7 @@ impl Default for EdgeDetectionUniform {
         Self {
             depth_threshold: 1.0,
             normal_threshold: 0.4,
-            color_threshold: 1.0,
+            color_threshold: 0.4,
             edge_color: Color::BLACK.into(),
 
             steep_angle_threshold: 0.0,
