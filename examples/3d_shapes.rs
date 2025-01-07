@@ -4,7 +4,11 @@ use std::f32::consts::PI;
 
 use bevy::{
     color::palettes::basic::SILVER,
-    core_pipeline::prepass::{DepthPrepass, NormalPrepass},
+    core_pipeline::{
+        core_3d::graph::Node3d,
+        prepass::{DepthPrepass, NormalPrepass},
+        smaa::Smaa,
+    },
     prelude::*,
     render::{
         render_asset::RenderAssetUsages,
@@ -17,7 +21,10 @@ use bevy_egui::{egui, EguiContexts, EguiPlugin};
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
-        .add_plugins(EdgeDetectionPlugin)
+        .add_plugins(EdgeDetectionPlugin {
+            before: Node3d::Smaa,
+            ..default()
+        })
         .add_plugins(EguiPlugin)
         .add_systems(Startup, setup)
         .add_systems(Update, (rotate, edge_detection_ui))
@@ -126,6 +133,7 @@ fn setup(
         DepthPrepass,
         NormalPrepass,
         EdgeDetectionUniform::default(),
+        Smaa::default(),
     ));
 }
 
@@ -164,9 +172,7 @@ fn uv_debug_texture() -> Image {
     )
 }
 
-fn edge_detection_ui(mut ctx: EguiContexts, mut ed_uniform: Query<&mut EdgeDetectionUniform>) {
-    let mut ed_uniform = ed_uniform.single_mut();
-
+fn edge_detection_ui(mut ctx: EguiContexts, mut ed_uniform: Single<&mut EdgeDetectionUniform>) {
     egui::Window::new("Edge Detection Settings").show(ctx.ctx_mut(), |ui| {
         ui.vertical(|ui| {
             ui.add(
