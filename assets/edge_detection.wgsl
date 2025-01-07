@@ -157,6 +157,46 @@ fn detect_edge_normal(pixel_coord: vec2i) -> f32 {
     return f32(grad > ed_uniform.normal_threshold);
 }
 
+// ----------------------
+// Color Detection ------
+// ----------------------
+
+fn prepass_color(pixel_coord: vec2i) -> vec3f {
+    return textureLoad(screen_texture, pixel_coord, 0).rgb;
+}
+
+fn color_gradient_x(pixel_coord: vec2i, y: i32) -> vec3f {
+    let l_coord = pixel_coord + vec2i(-1, y);    // left  coordinate
+    let r_coord = pixel_coord + vec2i( 1, y);    // right coordinate
+
+    return prepass_color(r_coord) - prepass_color(l_coord);
+}
+
+fn color_gradient_y(pixel_coord: vec2i, x: i32) -> vec3f {
+    let d_coord = pixel_coord + vec2i(x, -1);    // down coordinate
+    let t_coord = pixel_coord + vec2i(x,  1);    // top  coordinate
+
+    return prepass_color(t_coord) - prepass_color(d_coord);
+}
+
+fn detect_edge_color(pixel_coord: vec2i) -> f32 {
+    if ed_uniform.color_threshold == 0.0 { return 0.0; }
+
+    let grad_x = 
+        color_gradient_x(pixel_coord,  1) +
+        2.0 * color_gradient_x(pixel_coord,  0) +
+        color_gradient_x(pixel_coord, -1);
+
+    let grad_y =
+        color_gradient_y(pixel_coord, 1) +
+        2.0 * color_gradient_y(pixel_coord, 0) +
+        color_gradient_y(pixel_coord, -1);
+
+    let grad = max(length(grad_x), length(grad_y));
+
+    return f32(grad > ed_uniform.color_threshold);
+}
+
 @fragment
 fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
     var color = textureSample(screen_texture, texture_sampler, in.uv).rgb;
@@ -172,8 +212,9 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
 
     let edge_depth = detect_edge_depth(pixel_coord, NdotV);
     let edge_normal = detect_edge_normal(pixel_coord);
+    let edge_color = detect_edge_color(pixel_coord);
 
-    let edge = max(edge_depth, edge_normal);
+    let edge = max(edge_depth, max(edge_normal, edge_color));
     color = mix(color, ed_uniform.edge_color.rgb, edge);
 
     return vec4f(color, 1.0);

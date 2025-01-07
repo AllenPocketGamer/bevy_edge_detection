@@ -287,7 +287,7 @@ impl Default for EdgeDetectionUniform {
     fn default() -> Self {
         Self {
             depth_threshold: 1.0,
-            normal_threshold: 0.05,
+            normal_threshold: 0.4,
             color_threshold: 1.0,
             edge_color: Color::BLACK.into(),
 
