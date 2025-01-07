@@ -255,23 +255,40 @@ impl FromWorld for EdgeDetectionPipeline {
 // This is the component that will get passed to the shader
 #[derive(Component, Clone, Copy, ShaderType, ExtractComponent)]
 pub struct EdgeDetectionUniform {
+    /// Depth threshold, used to detect edges with significant depth changes.
+    /// Areas where the depth variation exceeds this threshold will be marked as edges.
     pub depth_threshold: f32,
+    /// Normal threshold, used to detect edges with significant normal direction changes.
+    /// Areas where the normal direction variation exceeds this threshold will be marked as edges.
     pub normal_threshold: f32,
+    /// Color threshold, used to detect edges with significant color changes.
+    /// Areas where the color variation exceeds this threshold will be marked as edges.
     pub color_threshold: f32,
+    /// Edge color, used to draw the detected edges.
+    /// Typically a high-contrast color (e.g., red or black) to visually highlight the edges.
     pub edge_color: LinearRgba,
-    pub debug: u32,
-    pub enabled: u32,
+
+    /// Steep angle threshold, used to adjust the depth threshold when viewing surfaces at steep angles.
+    /// When the angle between the view direction and the surface normal is very steep, the depth gradient
+    /// can appear artificially large, causing non-edge regions to be mistakenly detected as edges.
+    /// This threshold defines the angle at which the depth threshold adjustment begins to take effect.
+    pub steep_angle_threshold: f32,
+    /// Steep angle multiplier, used to scale the depth threshold adjustment for steep angles.
+    /// This value amplifies the effect of the steep angle adjustment, ensuring that the depth threshold
+    /// is appropriately relaxed in steep-angle regions to avoid false edge detection.
+    pub steep_angle_multiplier: f32,
 }
 
 impl Default for EdgeDetectionUniform {
     fn default() -> Self {
         Self {
-            depth_threshold: 0.2,
+            depth_threshold: 1.0,
             normal_threshold: 0.05,
             color_threshold: 1.0,
             edge_color: Color::BLACK.into(),
-            debug: 0,
-            enabled: 1,
+
+            steep_angle_threshold: 0.0,
+            steep_angle_multiplier: 1.0,
         }
     }
 }
