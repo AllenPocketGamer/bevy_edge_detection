@@ -2,8 +2,6 @@
 
 use std::f32::consts::PI;
 
-#[cfg(not(target_arch = "wasm32"))]
-use bevy::pbr::wireframe::{WireframeConfig, WireframePlugin};
 use bevy::{
     color::palettes::basic::SILVER,
     core_pipeline::prepass::{DepthPrepass, NormalPrepass},
@@ -14,24 +12,15 @@ use bevy::{
     },
 };
 use bevy_edge_detection::{EdgeDetectionPlugin, EdgeDetectionUniform};
+use bevy_egui::EguiPlugin;
 
 fn main() {
     App::new()
-        .add_plugins((
-            DefaultPlugins.set(ImagePlugin::default_nearest()),
-            #[cfg(not(target_arch = "wasm32"))]
-            WireframePlugin,
-        ))
+        .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
         .add_plugins(EdgeDetectionPlugin)
+        .add_plugins(EguiPlugin)
         .add_systems(Startup, setup)
-        .add_systems(
-            Update,
-            (
-                rotate,
-                #[cfg(not(target_arch = "wasm32"))]
-                toggle_wireframe,
-            ),
-        )
+        .add_systems(Update, rotate)
         .run();
 }
 
@@ -138,17 +127,6 @@ fn setup(
         NormalPrepass,
         EdgeDetectionUniform::default(),
     ));
-
-    #[cfg(not(target_arch = "wasm32"))]
-    commands.spawn((
-        Text::new("Press space to toggle wireframes"),
-        Node {
-            position_type: PositionType::Absolute,
-            top: Val::Px(12.0),
-            left: Val::Px(12.0),
-            ..default()
-        },
-    ));
 }
 
 fn rotate(mut query: Query<&mut Transform, With<Shape>>, time: Res<Time>) {
@@ -184,14 +162,4 @@ fn uv_debug_texture() -> Image {
         TextureFormat::Rgba8UnormSrgb,
         RenderAssetUsages::RENDER_WORLD,
     )
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-fn toggle_wireframe(
-    mut wireframe_config: ResMut<WireframeConfig>,
-    keyboard: Res<ButtonInput<KeyCode>>,
-) {
-    if keyboard.just_pressed(KeyCode::Space) {
-        wireframe_config.global = !wireframe_config.global;
-    }
 }
