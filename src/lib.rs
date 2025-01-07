@@ -272,10 +272,14 @@ pub struct EdgeDetectionUniform {
     /// When the angle between the view direction and the surface normal is very steep, the depth gradient
     /// can appear artificially large, causing non-edge regions to be mistakenly detected as edges.
     /// This threshold defines the angle at which the depth threshold adjustment begins to take effect.
+    /// 
+    /// Range: [0.0, 1.0]
     pub steep_angle_threshold: f32,
     /// Steep angle multiplier, used to scale the depth threshold adjustment for steep angles.
     /// This value amplifies the effect of the steep angle adjustment, ensuring that the depth threshold
     /// is appropriately relaxed in steep-angle regions to avoid false edge detection.
+    /// 
+    /// Range: [0.0, +inf]
     pub steep_angle_multiplier: f32,
 }
 

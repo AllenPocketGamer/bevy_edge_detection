@@ -10,4 +10,4 @@ description = "A bevy plugin adding edge detection post processing effect"
 bevy = "0.15.1"
 
 [dev-dependencies]
-bevy_egui = "0.31.0"
+bevy_egui = "0.32.0"

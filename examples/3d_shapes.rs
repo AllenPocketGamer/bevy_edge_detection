@@ -12,7 +12,7 @@ use bevy::{
     },
 };
 use bevy_edge_detection::{EdgeDetectionPlugin, EdgeDetectionUniform};
-use bevy_egui::EguiPlugin;
+use bevy_egui::{egui, EguiContexts, EguiPlugin};
 
 fn main() {
     App::new()
@@ -20,7 +20,7 @@ fn main() {
         .add_plugins(EdgeDetectionPlugin)
         .add_plugins(EguiPlugin)
         .add_systems(Startup, setup)
-        .add_systems(Update, rotate)
+        .add_systems(Update, (rotate, edge_detection_ui))
         .run();
 }
 
@@ -162,4 +162,42 @@ fn uv_debug_texture() -> Image {
         TextureFormat::Rgba8UnormSrgb,
         RenderAssetUsages::RENDER_WORLD,
     )
+}
+
+fn edge_detection_ui(mut ctx: EguiContexts, mut ed_uniform: Query<&mut EdgeDetectionUniform>) {
+    let mut ed_uniform = ed_uniform.single_mut();
+
+    egui::Window::new("Edge Detection Settings").show(ctx.ctx_mut(), |ui| {
+        ui.vertical(|ui| {
+            ui.add(
+                egui::Slider::new(&mut ed_uniform.depth_threshold, 0.0..=8.0)
+                    .text("depth_threshold"),
+            );
+            ui.add(
+                egui::Slider::new(&mut ed_uniform.normal_threshold, 0.0..=8.0)
+                    .text("normal_threshold"),
+            );
+            ui.add(
+                egui::Slider::new(&mut ed_uniform.color_threshold, 0.0..=8.0)
+                    .text("color_threshold"),
+            );
+
+            let mut color = ed_uniform.edge_color.to_f32_array_no_alpha();
+            ui.horizontal(|ui| {
+                egui::color_picker::color_edit_button_rgb(ui, &mut color);
+                ui.label("edge_color");
+            });
+            ed_uniform.edge_color = LinearRgba::from_f32_array_no_alpha(color);
+
+            ui.add(
+                egui::Slider::new(&mut ed_uniform.steep_angle_threshold, 0.0..=1.0)
+                    .text("steep_angle_threshold"),
+            );
+
+            ui.add(
+                egui::Slider::new(&mut ed_uniform.steep_angle_multiplier, 0.0..=8.0)
+                    .text("steep_angle_multiplier"),
+            );
+        });
+    });
 }
