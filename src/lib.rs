@@ -283,24 +283,17 @@ pub struct EdgeDetectionUniform {
     ///
     /// Range: [0.0, 1.0]
     pub steep_angle_threshold: f32,
-    /// Steep angle multiplier, used to scale the depth threshold adjustment for steep angles.
-    /// This value amplifies the effect of the steep angle adjustment, ensuring that the depth threshold
-    /// is appropriately relaxed in steep-angle regions to avoid false edge detection.
-    ///
-    /// Range: [0.0, +inf]
-    pub steep_angle_multiplier: f32,
 }
 
 impl Default for EdgeDetectionUniform {
     fn default() -> Self {
         Self {
             depth_threshold: 1.0,
-            normal_threshold: 0.4,
-            color_threshold: 0.4,
+            normal_threshold: 0.8,
+            color_threshold: 0.0,
             edge_color: Color::BLACK.into(),
 
-            steep_angle_threshold: 0.0,
-            steep_angle_multiplier: 1.0,
+            steep_angle_threshold: 0.5,
         }
     }
 }

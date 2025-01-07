@@ -199,11 +199,6 @@ fn edge_detection_ui(mut ctx: EguiContexts, mut ed_uniform: Single<&mut EdgeDete
                 egui::Slider::new(&mut ed_uniform.steep_angle_threshold, 0.0..=1.0)
                     .text("steep_angle_threshold"),
             );
-
-            ui.add(
-                egui::Slider::new(&mut ed_uniform.steep_angle_multiplier, 0.0..=8.0)
-                    .text("steep_angle_multiplier"),
-            );
         });
     });
 }

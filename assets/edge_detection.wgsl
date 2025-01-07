@@ -1,3 +1,8 @@
+//! Edge Detection using 3x3 Sobel Filter
+//!
+//! This shader implements edge detection based on depth, normal, and color gradients using a 3x3 Sobel filter.
+//! It combines the results of depth, normal, and color edge detection to produce a final edge map.
+
 #import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput
 #import bevy_render::view::View
 #import bevy_pbr::view_transformations::uv_to_ndc
@@ -16,7 +21,6 @@ struct EdgeDetectionUniform {
     edge_color: vec4f,
 
     steep_angle_threshold: f32,
-    steep_angle_multiplier: f32,
 }
 
 // -----------------------
@@ -86,7 +90,7 @@ fn view_z_gradient_y(pixel_coord: vec2i, x: i32) -> f32 {
     return prepass_view_z(t_coord) - prepass_view_z(d_coord);
 }
 
-fn detect_edge_depth(pixel_coord: vec2i, NdotV: f32) -> f32 {
+fn detect_edge_depth(pixel_coord: vec2i, steep_angle_adjustment: f32) -> f32 {
     if ed_uniform.depth_threshold == 0.0 { return 0.0; }
 
     let grad_x = 
@@ -105,10 +109,7 @@ fn detect_edge_depth(pixel_coord: vec2i, NdotV: f32) -> f32 {
     // causing overflow in the calculation and resulting in incorrect results.
     let grad = max(abs(grad_x), abs(grad_y));
 
-    let steep_angle_adjustment = 
-        smoothstep(ed_uniform.steep_angle_threshold, 1.0, 1.0 - NdotV) * ed_uniform.steep_angle_multiplier + 1.0;
-
-    return f32(grad > ed_uniform.depth_threshold * steep_angle_adjustment);
+    return f32(grad > ed_uniform.depth_threshold * (1.0 + steep_angle_adjustment));
 }
 
 // -----------------------
@@ -139,22 +140,25 @@ fn normal_gradient_y(pixel_coord: vec2i, x: i32) -> vec3f {
     return prepass_normal_unpack(t_coord) - prepass_normal_unpack(d_coord);
 }
 
-fn detect_edge_normal(pixel_coord: vec2i) -> f32 {
+fn detect_edge_normal(pixel_coord: vec2i, steep_angle_adjustment: f32) -> f32 {
     if ed_uniform.normal_threshold == 0.0 { return 0.0; }
 
-    let grad_x = 
+    let grad_x = abs(
         normal_gradient_x(pixel_coord,  1) +
         2.0 * normal_gradient_x(pixel_coord,  0) +
-        normal_gradient_x(pixel_coord, -1);
+        normal_gradient_x(pixel_coord, -1));
 
-    let grad_y =
+    let grad_y = abs(
         normal_gradient_y(pixel_coord, 1) +
         2.0 * normal_gradient_y(pixel_coord, 0) +
-        normal_gradient_y(pixel_coord, -1);
+        normal_gradient_y(pixel_coord, -1));
 
-    let grad = max(length(grad_x), length(grad_y));
+    let x_max = max(grad_x.x, max(grad_x.y, grad_x.z));
+    let y_max = max(grad_y.x, max(grad_y.y, grad_y.z));
+    
+    let grad = max(x_max, y_max);
 
-    return f32(grad > ed_uniform.normal_threshold);
+    return f32(grad > ed_uniform.normal_threshold * (1.0 - steep_angle_adjustment));
 }
 
 // ----------------------
@@ -208,14 +212,17 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
 
     let view_direction = calculate_view(world_position);
     let normal = prepass_normal(pixel_coord);
-    let NdotV = max(dot(normal, view_direction), 0.001);
+    let fresnel = 1.0 - saturate(dot(normal, view_direction));
 
-    let edge_depth = detect_edge_depth(pixel_coord, NdotV);
-    let edge_normal = detect_edge_normal(pixel_coord);
+    let steep_angle_adjustment = smoothstep(ed_uniform.steep_angle_threshold, 1.0, fresnel);
+
+    let edge_depth = detect_edge_depth(pixel_coord, steep_angle_adjustment);
+    let edge_normal = detect_edge_normal(pixel_coord, steep_angle_adjustment);
+    // TODO: detect_edge_color is shit, need upgrade!
     let edge_color = detect_edge_color(pixel_coord);
 
     let edge = max(edge_depth, max(edge_normal, edge_color));
     color = mix(color, ed_uniform.edge_color.rgb, edge);
 
-    return vec4f(color, 1.0);
+    return vec4f(vec3f(color), 1.0);
 }
