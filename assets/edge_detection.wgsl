@@ -116,12 +116,45 @@ fn detect_edge_depth(pixel_coord: vec2i, NdotV: f32) -> f32 {
 // -----------------------
 
 fn prepass_normal(pixel_coord: vec2i) -> vec3f {
-#ifdef MULTISAMPLED
-    let normal_sample = textureLoad(normal_prepass_texture, pixel_coord, 0);
-#else
-    let normal_sample = textureLoad(normal_prepass_texture, pixel_coord, 0);
-#endif // MULTISAMPLED
-    return normalize(normal_sample.xyz * 2.0 - vec3(1.0));
+    let normal_packed = textureLoad(normal_prepass_texture, pixel_coord, 0);
+    return normalize(normal_packed.xyz * 2.0 - vec3(1.0));
+}
+
+fn prepass_normal_unpack(pixel_coord: vec2i) -> vec3f {
+    let normal_packed = textureLoad(normal_prepass_texture, pixel_coord, 0);
+    return normal_packed.xyz;
+}
+
+fn normal_gradient_x(pixel_coord: vec2i, y: i32) -> vec3f {
+    let l_coord = pixel_coord + vec2i(-1, y);    // left  coordinate
+    let r_coord = pixel_coord + vec2i( 1, y);    // right coordinate
+
+    return prepass_normal_unpack(r_coord) - prepass_normal_unpack(l_coord);
+}
+
+fn normal_gradient_y(pixel_coord: vec2i, x: i32) -> vec3f {
+    let d_coord = pixel_coord + vec2i(x, -1);    // down coordinate
+    let t_coord = pixel_coord + vec2i(x,  1);    // top  coordinate
+
+    return prepass_normal_unpack(t_coord) - prepass_normal_unpack(d_coord);
+}
+
+fn detect_edge_normal(pixel_coord: vec2i) -> f32 {
+    if ed_uniform.normal_threshold == 0.0 { return 0.0; }
+
+    let grad_x = 
+        normal_gradient_x(pixel_coord,  1) +
+        2.0 * normal_gradient_x(pixel_coord,  0) +
+        normal_gradient_x(pixel_coord, -1);
+
+    let grad_y =
+        normal_gradient_y(pixel_coord, 1) +
+        2.0 * normal_gradient_y(pixel_coord, 0) +
+        normal_gradient_y(pixel_coord, -1);
+
+    let grad = max(length(grad_x), length(grad_y));
+
+    return f32(grad > ed_uniform.normal_threshold);
 }
 
 @fragment
@@ -138,8 +171,10 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
     let NdotV = max(dot(normal, view_direction), 0.001);
 
     let edge_depth = detect_edge_depth(pixel_coord, NdotV);
+    let edge_normal = detect_edge_normal(pixel_coord);
 
-    color = mix(color, ed_uniform.edge_color.rgb, edge_depth);
+    let edge = max(edge_depth, edge_normal);
+    color = mix(color, ed_uniform.edge_color.rgb, edge);
 
     return vec4f(color, 1.0);
 }
