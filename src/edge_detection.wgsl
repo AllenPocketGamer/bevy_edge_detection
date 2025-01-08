@@ -8,9 +8,9 @@
 #import bevy_pbr::view_transformations::uv_to_ndc
 
 @group(0) @binding(0) var screen_texture: texture_2d<f32>;
-@group(0) @binding(1) var texture_sampler: sampler;
-@group(0) @binding(2) var depth_prepass_texture: texture_depth_2d;
-@group(0) @binding(3) var normal_prepass_texture: texture_2d<f32>;
+@group(0) @binding(1) var depth_prepass_texture: texture_depth_2d;
+@group(0) @binding(2) var normal_prepass_texture: texture_2d<f32>;
+@group(0) @binding(3) var texture_sampler: sampler;
 @group(0) @binding(4) var<uniform> view: View;
 @group(0) @binding(5) var<uniform> ed_uniform: EdgeDetectionUniform;
 
