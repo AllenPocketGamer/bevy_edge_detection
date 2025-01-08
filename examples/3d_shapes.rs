@@ -17,6 +17,7 @@ use bevy::{
 };
 use bevy_edge_detection::{EdgeDetection, EdgeDetectionPlugin};
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
+use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 
 fn main() {
     App::new()
@@ -27,6 +28,7 @@ fn main() {
             before: Node3d::Smaa,
         })
         .add_plugins(EguiPlugin)
+        .add_plugins(PanOrbitCameraPlugin)
         .add_systems(Startup, setup)
         .add_systems(Update, (rotate, edge_detection_ui))
         .run();
@@ -137,6 +139,8 @@ fn setup(
         NormalPrepass,
         EdgeDetection::default(),
         Smaa::default(),
+        // to control camera
+        PanOrbitCamera::default(),
     ));
 }
 

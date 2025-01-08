@@ -14,3 +14,4 @@ bevy = "0.15.1"
 
 [dev-dependencies]
 bevy_egui = "0.32.0"
+bevy_panorbit_camera = { version = "0.21.*", features = ["bevy_egui"] }
