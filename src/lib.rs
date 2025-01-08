@@ -297,6 +297,16 @@ pub struct EdgeDetection {
     /// Edge color, used to draw the detected edges.
     /// Typically a high-contrast color (e.g., red or black) to visually highlight the edges.
     pub edge_color: Color,
+
+    /// Whether to enable depth-based edge detection.
+    /// If `true`, edges will be detected based on depth variations.
+    pub enable_depth: bool,
+    /// Whether to enable normal-based edge detection.
+    /// If `true`, edges will be detected based on normal direction variations.
+    pub enable_normal: bool,
+    /// Whether to enable color-based edge detection.
+    /// If `true`, edges will be detected based on color variations.
+    pub enable_color: bool,
 }
 
 impl Default for EdgeDetection {
@@ -309,6 +319,10 @@ impl Default for EdgeDetection {
             edge_color: Color::BLACK.into(),
 
             steep_angle_threshold: 0.5,
+
+            enable_depth: true,
+            enable_normal: true,
+            enable_color: true,
         }
     }
 }

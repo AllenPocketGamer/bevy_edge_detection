@@ -15,7 +15,7 @@ use bevy::{
         render_resource::{Extent3d, TextureDimension, TextureFormat},
     },
 };
-use bevy_edge_detection::{EdgeDetectionPlugin, EdgeDetection};
+use bevy_edge_detection::{EdgeDetection, EdgeDetectionPlugin};
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
 
 fn main() {
@@ -175,18 +175,38 @@ fn uv_debug_texture() -> Image {
 fn edge_detection_ui(mut ctx: EguiContexts, mut edge_detection: Single<&mut EdgeDetection>) {
     egui::Window::new("Edge Detection Settings").show(ctx.ctx_mut(), |ui| {
         ui.vertical(|ui| {
-            ui.add(
-                egui::Slider::new(&mut edge_detection.depth_threshold, 0.0..=8.0)
-                    .text("depth_threshold"),
-            );
-            ui.add(
-                egui::Slider::new(&mut edge_detection.normal_threshold, 0.0..=8.0)
-                    .text("normal_threshold"),
-            );
-            ui.add(
-                egui::Slider::new(&mut edge_detection.color_threshold, 0.0..=8.0)
-                    .text("color_threshold"),
-            );
+            ui.horizontal(|ui| {
+                ui.add(egui::Checkbox::new(
+                    &mut edge_detection.enable_depth,
+                    "enable_depth",
+                ));
+                ui.add(
+                    egui::Slider::new(&mut edge_detection.depth_threshold, 0.0..=8.0)
+                        .text("depth_threshold"),
+                );
+            });
+
+            ui.horizontal(|ui| {
+                ui.add(egui::Checkbox::new(
+                    &mut edge_detection.enable_normal,
+                    "enable_normal",
+                ));
+                ui.add(
+                    egui::Slider::new(&mut edge_detection.normal_threshold, 0.0..=8.0)
+                        .text("normal_threshold"),
+                );
+            });
+
+            ui.horizontal(|ui| {
+                ui.add(egui::Checkbox::new(
+                    &mut edge_detection.enable_color,
+                    "enable_color",
+                ));
+                ui.add(
+                    egui::Slider::new(&mut edge_detection.color_threshold, 0.0..=8.0)
+                        .text("color_threshold"),
+                );
+            });
 
             let mut color = edge_detection.edge_color.to_srgba().to_f32_array_no_alpha();
             ui.horizontal(|ui| {
