@@ -8,8 +8,19 @@
 #import bevy_pbr::view_transformations::uv_to_ndc
 
 @group(0) @binding(0) var screen_texture: texture_2d<f32>;
+
+#ifdef MULTISAMPLED
+@group(0) @binding(1) var depth_prepass_texture: texture_depth_multisampled_2d;
+#else
 @group(0) @binding(1) var depth_prepass_texture: texture_depth_2d;
+#endif
+
+#ifdef MULTISAMPLED
+@group(0) @binding(2) var normal_prepass_texture: texture_multisampled_2d<f32>;
+#else
 @group(0) @binding(2) var normal_prepass_texture: texture_2d<f32>;
+#endif
+
 @group(0) @binding(3) var texture_sampler: sampler;
 @group(0) @binding(4) var<uniform> view: View;
 @group(0) @binding(5) var<uniform> ed_uniform: EdgeDetectionUniform;
@@ -73,7 +84,11 @@ fn calculate_view(world_position: vec3f) -> vec3f {
 // -----------------------
 
 fn prepass_view_z(pixel_coord: vec2i) -> f32 {
+#ifdef MULTISAMPLED
+    let depth = textureLoad(depth_prepass_texture, pixel_coord, sample_index_i);
+#else
     let depth = textureLoad(depth_prepass_texture, pixel_coord, 0);
+#endif
     return depth_ndc_to_view_z(depth);
 }
 
@@ -92,8 +107,6 @@ fn view_z_gradient_y(pixel_coord: vec2i, x: i32) -> f32 {
 }
 
 fn detect_edge_depth(pixel_coord: vec2i, steep_angle_adjustment: f32) -> f32 {
-    if ed_uniform.depth_threshold == 0.0 { return 0.0; }
-
     let grad_x = 
         view_z_gradient_x(pixel_coord,  1) +
         2.0 * view_z_gradient_x(pixel_coord,  0) +
@@ -117,33 +130,35 @@ fn detect_edge_depth(pixel_coord: vec2i, steep_angle_adjustment: f32) -> f32 {
 // Normal Detection ------
 // -----------------------
 
-fn prepass_normal(pixel_coord: vec2i) -> vec3f {
-    let normal_packed = textureLoad(normal_prepass_texture, pixel_coord, 0);
+fn prepass_normal_unpack(pixel_coord: vec2i) -> vec3f {
+    let normal_packed = prepass_normal(pixel_coord);
     return normalize(normal_packed.xyz * 2.0 - vec3(1.0));
 }
 
-fn prepass_normal_unpack(pixel_coord: vec2i) -> vec3f {
-    let normal_packed = textureLoad(normal_prepass_texture, pixel_coord, 0);
-    return normal_packed.xyz;
+fn prepass_normal(pixel_coord: vec2i) -> vec3f {
+#ifdef MULTISAMPLED
+    let normal = textureLoad(normal_prepass_texture, pixel_coord, sample_index_i);
+#else
+    let normal = textureLoad(normal_prepass_texture, pixel_coord, 0);
+#endif
+    return normal.xyz;
 }
 
 fn normal_gradient_x(pixel_coord: vec2i, y: i32) -> vec3f {
     let l_coord = pixel_coord + vec2i(-1, y);    // left  coordinate
     let r_coord = pixel_coord + vec2i( 1, y);    // right coordinate
 
-    return prepass_normal_unpack(r_coord) - prepass_normal_unpack(l_coord);
+    return prepass_normal(r_coord) - prepass_normal(l_coord);
 }
 
 fn normal_gradient_y(pixel_coord: vec2i, x: i32) -> vec3f {
     let d_coord = pixel_coord + vec2i(x, -1);    // down coordinate
     let t_coord = pixel_coord + vec2i(x,  1);    // top  coordinate
 
-    return prepass_normal_unpack(t_coord) - prepass_normal_unpack(d_coord);
+    return prepass_normal(t_coord) - prepass_normal(d_coord);
 }
 
 fn detect_edge_normal(pixel_coord: vec2i, steep_angle_adjustment: f32) -> f32 {
-    if ed_uniform.normal_threshold == 0.0 { return 0.0; }
-
     let grad_x = abs(
         normal_gradient_x(pixel_coord,  1) +
         2.0 * normal_gradient_x(pixel_coord,  0) +
@@ -185,8 +200,6 @@ fn color_gradient_y(pixel_coord: vec2i, x: i32) -> vec3f {
 }
 
 fn detect_edge_color(pixel_coord: vec2i) -> f32 {
-    if ed_uniform.color_threshold == 0.0 { return 0.0; }
-
     let grad_x = 
         color_gradient_x(pixel_coord,  1) +
         2.0 * color_gradient_x(pixel_coord,  0) +
@@ -202,9 +215,18 @@ fn detect_edge_color(pixel_coord: vec2i) -> f32 {
     return f32(grad > ed_uniform.color_threshold);
 }
 
+var<private> sample_index_i: i32 = 0;
+
 @fragment
-fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
-    var color = textureSample(screen_texture, texture_sampler, in.uv).rgb;
+fn fragment(
+#ifdef MULTISAMPLED
+    @builtin(sample_index) sample_index: u32,
+#endif
+    in: FullscreenVertexOutput
+) -> @location(0) vec4f {
+#ifdef MULTISAMPLED
+    sample_index_i = i32(sample_index);
+#endif
 
     let pixel_coord = vec2i(in.position.xy);
 
@@ -212,16 +234,25 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
     let world_position = position_ndc_to_world(ndc);
 
     let view_direction = calculate_view(world_position);
-    let normal = prepass_normal(pixel_coord);
+    let normal = prepass_normal_unpack(pixel_coord);
     let fresnel = 1.0 - saturate(dot(normal, view_direction));
-
     let steep_angle_adjustment = smoothstep(ed_uniform.steep_angle_threshold, 1.0, fresnel);
 
-    let edge_depth = detect_edge_depth(pixel_coord, steep_angle_adjustment);
-    let edge_normal = detect_edge_normal(pixel_coord, steep_angle_adjustment);
-    let edge_color = detect_edge_color(pixel_coord);
+    var edge = 0.0;
 
-    let edge = max(edge_depth, max(edge_normal, edge_color));
+#ifdef ENABLE_DEPTH
+    edge = max(edge, detect_edge_depth(pixel_coord, steep_angle_adjustment));
+#endif
+
+#ifdef ENABLE_NORMAL
+    edge = max(edge, detect_edge_normal(pixel_coord, steep_angle_adjustment));
+#endif
+
+#ifdef ENABLE_COLOR
+    edge = max(edge, detect_edge_color(pixel_coord));
+#endif
+
+    var color = textureSample(screen_texture, texture_sampler, in.uv).rgb;
     color = mix(color, ed_uniform.edge_color.rgb, edge);
 
     return vec4f(vec3f(color), 1.0);
