@@ -15,7 +15,7 @@ use bevy::{
         render_resource::{Extent3d, TextureDimension, TextureFormat},
     },
 };
-use bevy_edge_detection::{EdgeDetectionPlugin, EdgeDetectionUniform};
+use bevy_edge_detection::{EdgeDetectionPlugin, EdgeDetection};
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
 
 fn main() {
@@ -132,7 +132,7 @@ fn setup(
         Msaa::Off,
         DepthPrepass,
         NormalPrepass,
-        EdgeDetectionUniform::default(),
+        EdgeDetection::default(),
         Smaa::default(),
     ));
 }
@@ -172,31 +172,31 @@ fn uv_debug_texture() -> Image {
     )
 }
 
-fn edge_detection_ui(mut ctx: EguiContexts, mut ed_uniform: Single<&mut EdgeDetectionUniform>) {
+fn edge_detection_ui(mut ctx: EguiContexts, mut edge_detection: Single<&mut EdgeDetection>) {
     egui::Window::new("Edge Detection Settings").show(ctx.ctx_mut(), |ui| {
         ui.vertical(|ui| {
             ui.add(
-                egui::Slider::new(&mut ed_uniform.depth_threshold, 0.0..=8.0)
+                egui::Slider::new(&mut edge_detection.depth_threshold, 0.0..=8.0)
                     .text("depth_threshold"),
             );
             ui.add(
-                egui::Slider::new(&mut ed_uniform.normal_threshold, 0.0..=8.0)
+                egui::Slider::new(&mut edge_detection.normal_threshold, 0.0..=8.0)
                     .text("normal_threshold"),
             );
             ui.add(
-                egui::Slider::new(&mut ed_uniform.color_threshold, 0.0..=8.0)
+                egui::Slider::new(&mut edge_detection.color_threshold, 0.0..=8.0)
                     .text("color_threshold"),
             );
 
-            let mut color = ed_uniform.edge_color.to_f32_array_no_alpha();
+            let mut color = edge_detection.edge_color.to_srgba().to_f32_array_no_alpha();
             ui.horizontal(|ui| {
                 egui::color_picker::color_edit_button_rgb(ui, &mut color);
                 ui.label("edge_color");
             });
-            ed_uniform.edge_color = LinearRgba::from_f32_array_no_alpha(color);
+            edge_detection.edge_color = Color::srgb_from_array(color);
 
             ui.add(
-                egui::Slider::new(&mut ed_uniform.steep_angle_threshold, 0.0..=1.0)
+                egui::Slider::new(&mut edge_detection.steep_angle_threshold, 0.0..=1.0)
                     .text("steep_angle_threshold"),
             );
         });

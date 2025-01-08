@@ -1,6 +1,10 @@
 use bevy::{
+    asset::load_internal_asset,
     core_pipeline::{
-        core_3d::graph::{Core3d, Node3d},
+        core_3d::{
+            graph::{Core3d, Node3d},
+            DEPTH_TEXTURE_SAMPLING_SUPPORTED,
+        },
         fullscreen_vertex_shader::fullscreen_shader_vertex_state,
         prepass::ViewPrepassTextures,
     },
@@ -8,8 +12,7 @@ use bevy::{
     prelude::*,
     render::{
         extract_component::{
-            ComponentUniforms, DynamicUniformIndex, ExtractComponent, ExtractComponentPlugin,
-            UniformComponentPlugin,
+            ComponentUniforms, DynamicUniformIndex, ExtractComponent, UniformComponentPlugin,
         },
         render_graph::{
             NodeRunError, RenderGraphApp, RenderGraphContext, RenderLabel, ViewNode, ViewNodeRunner,
@@ -19,14 +22,16 @@ use bevy::{
             *,
         },
         renderer::{RenderContext, RenderDevice},
+        sync_component::SyncComponentPlugin,
+        sync_world::RenderEntity,
         view::{ViewTarget, ViewUniform, ViewUniformOffset, ViewUniforms},
-        RenderApp,
+        Extract, RenderApp,
     },
 };
 use binding_types::texture_depth_2d;
 
-// TODO: delete it
-const SHADER_ASSET_PATH: &str = "edge_detection.wgsl";
+const EDGE_DETECTION_SHADER_HANDLE: Handle<Shader> =
+    Handle::weak_from_u128(98765432109876543210987654321098765);
 
 /// An edge detection post-processing plugin based on the sobel filter.
 pub struct EdgeDetectionPlugin {
@@ -45,10 +50,17 @@ impl Default for EdgeDetectionPlugin {
 
 impl Plugin for EdgeDetectionPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((
-            ExtractComponentPlugin::<EdgeDetectionUniform>::default(),
-            UniformComponentPlugin::<EdgeDetectionUniform>::default(),
-        ));
+        load_internal_asset!(
+            app,
+            EDGE_DETECTION_SHADER_HANDLE,
+            "edge_detection.wgsl",
+            Shader::from_wgsl
+        );
+
+        app.register_type::<EdgeDetection>();
+
+        app.add_plugins(SyncComponentPlugin::<EdgeDetection>::default())
+            .add_plugins(UniformComponentPlugin::<EdgeDetectionUniform>::default());
 
         // We need to get the render app from the main app
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
@@ -56,6 +68,10 @@ impl Plugin for EdgeDetectionPlugin {
         };
 
         render_app
+            .add_systems(
+                ExtractSchedule,
+                EdgeDetectionUniform::extract_edge_detection_settings,
+            )
             .add_render_graph_node::<ViewNodeRunner<EdgeDetectionNode>>(Core3d, EdgeDetectionLabel)
             .add_render_graph_edges(
                 Core3d,
@@ -220,9 +236,6 @@ impl FromWorld for EdgeDetectionPipeline {
         // We can create the sampler here since it won't change at runtime and doesn't depend on the view
         let sampler = render_device.create_sampler(&SamplerDescriptor::default());
 
-        // Get the shader handle
-        let shader = world.load_asset(SHADER_ASSET_PATH);
-
         let pipeline_id = world
             .resource_mut::<PipelineCache>()
             // This will add the pipeline to the cache and queue its creation
@@ -232,7 +245,7 @@ impl FromWorld for EdgeDetectionPipeline {
                 // This will setup a fullscreen triangle for the vertex state
                 vertex: fullscreen_shader_vertex_state(),
                 fragment: Some(FragmentState {
-                    shader,
+                    shader: EDGE_DETECTION_SHADER_HANDLE,
                     shader_defs: vec![],
                     // Make sure this matches the entry point of your shader.
                     // It can be anything as long as it matches here and in the shader.
@@ -260,9 +273,9 @@ impl FromWorld for EdgeDetectionPipeline {
     }
 }
 
-// This is the component that will get passed to the shader
-#[derive(Component, Clone, Copy, ShaderType, ExtractComponent)]
-pub struct EdgeDetectionUniform {
+#[derive(Component, Clone, Copy, Debug, Reflect)]
+#[reflect(Component, Default)]
+pub struct EdgeDetection {
     /// Depth threshold, used to detect edges with significant depth changes.
     /// Areas where the depth variation exceeds this threshold will be marked as edges.
     pub depth_threshold: f32,
@@ -272,9 +285,6 @@ pub struct EdgeDetectionUniform {
     /// Color threshold, used to detect edges with significant color changes.
     /// Areas where the color variation exceeds this threshold will be marked as edges.
     pub color_threshold: f32,
-    /// Edge color, used to draw the detected edges.
-    /// Typically a high-contrast color (e.g., red or black) to visually highlight the edges.
-    pub edge_color: LinearRgba,
 
     /// Steep angle threshold, used to adjust the depth threshold when viewing surfaces at steep angles.
     /// When the angle between the view direction and the surface normal is very steep, the depth gradient
@@ -283,17 +293,65 @@ pub struct EdgeDetectionUniform {
     ///
     /// Range: [0.0, 1.0]
     pub steep_angle_threshold: f32,
+
+    /// Edge color, used to draw the detected edges.
+    /// Typically a high-contrast color (e.g., red or black) to visually highlight the edges.
+    pub edge_color: Color,
 }
 
-impl Default for EdgeDetectionUniform {
+impl Default for EdgeDetection {
     fn default() -> Self {
         Self {
             depth_threshold: 1.0,
             normal_threshold: 0.8,
             color_threshold: 0.0,
+
             edge_color: Color::BLACK.into(),
 
             steep_angle_threshold: 0.5,
+        }
+    }
+}
+
+#[derive(Component, Clone, Copy, ShaderType, ExtractComponent)]
+struct EdgeDetectionUniform {
+    depth_threshold: f32,
+    normal_threshold: f32,
+    color_threshold: f32,
+    steep_angle_threshold: f32,
+    edge_color: LinearRgba,
+}
+
+impl EdgeDetectionUniform {
+    fn extract_edge_detection_settings(
+        mut commands: Commands,
+        mut query: Extract<Query<(RenderEntity, &EdgeDetection)>>,
+    ) {
+        if !DEPTH_TEXTURE_SAMPLING_SUPPORTED {
+            info_once!(
+                "Disable edge detection on this platform because depth textures aren't supported correctly"
+            );
+            return;
+        }
+
+        for (entity, edge_detection) in query.iter_mut() {
+            let mut entity_commands = commands
+                .get_entity(entity)
+                .expect("Edge Detection entity wasn't synced.");
+
+            entity_commands.insert(EdgeDetectionUniform::from(edge_detection));
+        }
+    }
+}
+
+impl From<&EdgeDetection> for EdgeDetectionUniform {
+    fn from(ed: &EdgeDetection) -> Self {
+        Self {
+            depth_threshold: ed.depth_threshold,
+            normal_threshold: ed.normal_threshold,
+            color_threshold: ed.color_threshold,
+            steep_angle_threshold: ed.steep_angle_threshold,
+            edge_color: ed.edge_color.into(),
         }
     }
 }

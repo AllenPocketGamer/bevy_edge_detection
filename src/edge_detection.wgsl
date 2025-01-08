@@ -18,9 +18,10 @@ struct EdgeDetectionUniform {
     depth_threshold: f32,
     normal_threshold: f32,
     color_threshold: f32,
-    edge_color: vec4f,
-
+    
     steep_angle_threshold: f32,
+
+    edge_color: vec4f,
 }
 
 // -----------------------
@@ -218,7 +219,6 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
 
     let edge_depth = detect_edge_depth(pixel_coord, steep_angle_adjustment);
     let edge_normal = detect_edge_normal(pixel_coord, steep_angle_adjustment);
-    // TODO: detect_edge_color is shit, need upgrade!
     let edge_color = detect_edge_color(pixel_coord);
 
     let edge = max(edge_depth, max(edge_normal, edge_color));
