@@ -321,7 +321,7 @@ impl Default for EdgeDetection {
         Self {
             depth_threshold: 1.0,
             normal_threshold: 0.8,
-            color_threshold: 0.0,
+            color_threshold: 0.1,
 
             edge_color: Color::BLACK.into(),
 
@@ -329,7 +329,7 @@ impl Default for EdgeDetection {
 
             enable_depth: true,
             enable_normal: true,
-            enable_color: true,
+            enable_color: false,
         }
     }
 }
