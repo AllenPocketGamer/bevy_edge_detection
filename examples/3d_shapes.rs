@@ -22,8 +22,9 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
         .add_plugins(EdgeDetectionPlugin {
+            // If you wish to apply Smaa anti-aliasing after edge detection,
+            // please ensure that the rendering order of [`EdgeDetectionNode`] is set before [`SmaaNode`].
             before: Node3d::Smaa,
-            ..default()
         })
         .add_plugins(EguiPlugin)
         .add_systems(Startup, setup)
@@ -129,6 +130,8 @@ fn setup(
             clear_color: Color::WHITE.into(),
             ..default()
         },
+        // [`EdgeDetectionNode`] supports `Msaa``, and you can enable it at any time, for example:
+        // Msaa::default(),
         Msaa::Off,
         DepthPrepass,
         NormalPrepass,
