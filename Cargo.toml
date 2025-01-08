@@ -7,7 +7,7 @@ authors = ["AllenPocketGamer <allenpocketwork@gmail.com>"]
 description = "A bevy plugin adding edge detection post processing effect"
 homepage = "https://github.com/AllenPocketGamer/bevy_edge_detection"
 keywords = ["bevy", "plugin", "post-processing", "edge-detection"]
-categories = ["game-engines", "graphics", "bevy", "rendering"]
+categories = ["game-engines", "graphics", "rendering"]
 
 [dependencies]
 bevy = "0.15.1"
