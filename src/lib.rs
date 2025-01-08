@@ -360,7 +360,7 @@ impl EdgeDetectionUniform {
                 .get_entity(entity)
                 .expect("Edge Detection entity wasn't synced.");
 
-            entity_commands.insert(EdgeDetectionUniform::from(edge_detection));
+            entity_commands.insert((*edge_detection, EdgeDetectionUniform::from(edge_detection)));
         }
     }
 }
