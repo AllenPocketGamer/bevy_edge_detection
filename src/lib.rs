@@ -35,14 +35,12 @@ const EDGE_DETECTION_SHADER_HANDLE: Handle<Shader> =
 
 /// An edge detection post-processing plugin based on the sobel filter.
 pub struct EdgeDetectionPlugin {
-    pub after: Node3d,
     pub before: Node3d,
 }
 
 impl Default for EdgeDetectionPlugin {
     fn default() -> Self {
         Self {
-            after: Node3d::Tonemapping,
             before: Node3d::Fxaa,
         }
     }
@@ -75,7 +73,7 @@ impl Plugin for EdgeDetectionPlugin {
             .add_render_graph_node::<ViewNodeRunner<EdgeDetectionNode>>(Core3d, EdgeDetectionLabel)
             .add_render_graph_edges(
                 Core3d,
-                (self.after.clone(), EdgeDetectionLabel, self.before.clone()),
+                (Node3d::PostProcessing, EdgeDetectionLabel, self.before.clone()),
             );
     }
 
