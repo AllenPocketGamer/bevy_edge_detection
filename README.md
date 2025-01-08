@@ -41,8 +41,6 @@ fn main() {
 commands.spawn((
     Camera3d::default(),
     Transform::default(),
-    DepthPrepass,   // `EdgeDetectionPlugin` need it
-    NormalPrepass,  // `EdgeDetectionPlugin` need it
     EdgeDetection::default(),
 ));
 ```
