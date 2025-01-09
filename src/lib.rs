@@ -6,7 +6,7 @@ use bevy::{
             DEPTH_TEXTURE_SAMPLING_SUPPORTED,
         },
         fullscreen_vertex_shader::fullscreen_shader_vertex_state,
-        prepass::ViewPrepassTextures,
+        prepass::{DepthPrepass, NormalPrepass, ViewPrepassTextures},
     },
     ecs::query::QueryItem,
     prelude::*,
@@ -282,6 +282,7 @@ impl EdgeDetectionKey {
 
 #[derive(Component, Clone, Copy, Debug, Reflect)]
 #[reflect(Component, Default)]
+#[require(DepthPrepass, NormalPrepass)]
 pub struct EdgeDetection {
     /// Depth threshold, used to detect edges with significant depth changes.
     /// Areas where the depth variation exceeds this threshold will be marked as edges.

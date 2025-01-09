@@ -1,6 +1,6 @@
 [package]
 name = "bevy_edge_detection"
-version = "0.15.1"
+version = "0.15.2"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 authors = ["AllenPocketGamer <allenpocketwork@gmail.com>"]
@@ -14,3 +14,4 @@ bevy = "0.15.1"
 
 [dev-dependencies]
 bevy_egui = "0.32.0"
+bevy_panorbit_camera = { version = "0.21.*", features = ["bevy_egui"] }
