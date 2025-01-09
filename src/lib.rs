@@ -324,7 +324,7 @@ impl Default for EdgeDetection {
             normal_threshold: 0.8,
             color_threshold: 0.1,
 
-            edge_color: Color::BLACK.into(),
+            edge_color: Color::BLACK,
 
             steep_angle_threshold: 0.5,
 
