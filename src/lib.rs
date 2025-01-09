@@ -282,6 +282,7 @@ impl EdgeDetectionKey {
 
 #[derive(Component, Clone, Copy, Debug, Reflect)]
 #[reflect(Component, Default)]
+#[require(DepthPrepass, NormalPrepass)]
 pub struct EdgeDetection {
     /// Depth threshold, used to detect edges with significant depth changes.
     /// Areas where the depth variation exceeds this threshold will be marked as edges.

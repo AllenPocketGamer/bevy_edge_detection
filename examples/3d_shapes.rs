@@ -135,8 +135,6 @@ fn setup(
         // [`EdgeDetectionNode`] supports `Msaa``, and you can enable it at any time, for example:
         // Msaa::default(),
         Msaa::Off,
-        DepthPrepass,
-        NormalPrepass,
         EdgeDetection::default(),
         Smaa::default(),
         // to control camera
