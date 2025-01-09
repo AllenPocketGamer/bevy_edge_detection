@@ -4,11 +4,7 @@ use std::f32::consts::PI;
 
 use bevy::{
     color::palettes::basic::SILVER,
-    core_pipeline::{
-        core_3d::graph::Node3d,
-        prepass::{DepthPrepass, NormalPrepass},
-        smaa::Smaa,
-    },
+    core_pipeline::{core_3d::graph::Node3d, smaa::Smaa},
     prelude::*,
     render::{
         render_asset::RenderAssetUsages,

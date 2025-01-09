@@ -6,7 +6,7 @@ use bevy::{
             DEPTH_TEXTURE_SAMPLING_SUPPORTED,
         },
         fullscreen_vertex_shader::fullscreen_shader_vertex_state,
-        prepass::ViewPrepassTextures,
+        prepass::{DepthPrepass, NormalPrepass, ViewPrepassTextures},
     },
     ecs::query::QueryItem,
     prelude::*,
