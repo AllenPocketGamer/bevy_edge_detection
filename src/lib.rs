@@ -301,6 +301,15 @@ pub struct EdgeDetection {
     ///
     /// Range: [0.0, 1.0]
     pub steep_angle_threshold: f32,
+    /// Multiplier applied to the depth threshold when the view angle is steep.
+    /// When the angle between the view direction and the surface normal exceeds the `steep_angle_threshold`,
+    /// the depth threshold is scaled by this multiplier to reduce the likelihood of false edge detection.
+    ///
+    /// A value of 1.0 means no adjustment, while values greater than 1.0 increase the depth threshold,
+    /// making edge detection less sensitive in steep angles.
+    ///
+    /// Range: [0.0, inf)
+    pub steep_angle_multiplier: f32,
 
     /// Edge color, used to draw the detected edges.
     /// Typically a high-contrast color (e.g., red or black) to visually highlight the edges.
@@ -326,7 +335,8 @@ impl Default for EdgeDetection {
 
             edge_color: Color::BLACK,
 
-            steep_angle_threshold: 0.5,
+            steep_angle_threshold: 0.0,
+            steep_angle_multiplier: 0.15,
 
             enable_depth: true,
             enable_normal: true,
@@ -341,6 +351,7 @@ pub struct EdgeDetectionUniform {
     pub normal_threshold: f32,
     pub color_threshold: f32,
     pub steep_angle_threshold: f32,
+    pub steep_angle_multiplier: f32,
     pub edge_color: LinearRgba,
 }
 
@@ -373,6 +384,7 @@ impl From<&EdgeDetection> for EdgeDetectionUniform {
             normal_threshold: ed.normal_threshold,
             color_threshold: ed.color_threshold,
             steep_angle_threshold: ed.steep_angle_threshold,
+            steep_angle_multiplier: ed.steep_angle_multiplier,
             edge_color: ed.edge_color.into(),
         }
     }

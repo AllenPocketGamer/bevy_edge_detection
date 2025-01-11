@@ -220,6 +220,10 @@ fn edge_detection_ui(mut ctx: EguiContexts, mut edge_detection: Single<&mut Edge
                 egui::Slider::new(&mut edge_detection.steep_angle_threshold, 0.0..=1.0)
                     .text("steep_angle_threshold"),
             );
+            ui.add(
+                egui::Slider::new(&mut edge_detection.steep_angle_multiplier, 0.0..=1.0)
+                    .text("steep_angle_multiplier"),
+            );
         });
     });
 }

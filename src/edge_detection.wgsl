@@ -31,6 +31,7 @@ struct EdgeDetectionUniform {
     color_threshold: f32,
     
     steep_angle_threshold: f32,
+    steep_angle_multiplier: f32,
 
     edge_color: vec4f,
 }
@@ -106,22 +107,27 @@ fn view_z_gradient_y(pixel_coord: vec2i, x: i32) -> f32 {
     return prepass_view_z(t_coord) - prepass_view_z(d_coord);
 }
 
-fn detect_edge_depth(pixel_coord: vec2i, steep_angle_adjustment: f32) -> f32 {
-    let grad_x = 
+fn detect_edge_depth(pixel_coord: vec2i, fresnel: f32) -> f32 {
+    let deri_x = 
         view_z_gradient_x(pixel_coord,  1) +
         2.0 * view_z_gradient_x(pixel_coord,  0) +
         view_z_gradient_x(pixel_coord, -1);
 
-    let grad_y =
+    let deri_y =
         view_z_gradient_y(pixel_coord, 1) +
         2.0 * view_z_gradient_y(pixel_coord, 0) +
         view_z_gradient_y(pixel_coord, -1);
 
-    // why not `let grad = sqrt(grad_x * grad_x + grad_y * grad_y);`?
+    // why not `let grad = sqrt(deri_x * deri_x + deri_y * deri_y);`?
     //
-    // Because ·grad_x· or ·grad_y· might be too large,
+    // Because ·deri_x· or ·deri_y· might be too large,
     // causing overflow in the calculation and resulting in incorrect results.
-    let grad = max(abs(grad_x), abs(grad_y));
+    let grad = max(abs(deri_x), abs(deri_y));
+
+    let view_z = abs(prepass_view_z(pixel_coord));
+
+    let steep_angle_adjustment = 
+        smoothstep(ed_uniform.steep_angle_threshold, 1.0, fresnel) * ed_uniform.steep_angle_multiplier * view_z;
 
     return f32(grad > ed_uniform.depth_threshold * (1.0 + steep_angle_adjustment));
 }
@@ -158,23 +164,23 @@ fn normal_gradient_y(pixel_coord: vec2i, x: i32) -> vec3f {
     return prepass_normal(t_coord) - prepass_normal(d_coord);
 }
 
-fn detect_edge_normal(pixel_coord: vec2i, steep_angle_adjustment: f32) -> f32 {
-    let grad_x = abs(
+fn detect_edge_normal(pixel_coord: vec2i) -> f32 {
+    let deri_x = abs(
         normal_gradient_x(pixel_coord,  1) +
         2.0 * normal_gradient_x(pixel_coord,  0) +
         normal_gradient_x(pixel_coord, -1));
 
-    let grad_y = abs(
+    let deri_y = abs(
         normal_gradient_y(pixel_coord, 1) +
         2.0 * normal_gradient_y(pixel_coord, 0) +
         normal_gradient_y(pixel_coord, -1));
 
-    let x_max = max(grad_x.x, max(grad_x.y, grad_x.z));
-    let y_max = max(grad_y.x, max(grad_y.y, grad_y.z));
+    let x_max = max(deri_x.x, max(deri_x.y, deri_x.z));
+    let y_max = max(deri_y.x, max(deri_y.y, deri_y.z));
     
     let grad = max(x_max, y_max);
 
-    return f32(grad > ed_uniform.normal_threshold * (1.0 - steep_angle_adjustment));
+    return f32(grad > ed_uniform.normal_threshold);
 }
 
 // ----------------------
@@ -200,17 +206,17 @@ fn color_gradient_y(pixel_coord: vec2i, x: i32) -> vec3f {
 }
 
 fn detect_edge_color(pixel_coord: vec2i) -> f32 {
-    let grad_x = 
+    let deri_x = 
         color_gradient_x(pixel_coord,  1) +
         2.0 * color_gradient_x(pixel_coord,  0) +
         color_gradient_x(pixel_coord, -1);
 
-    let grad_y =
+    let deri_y =
         color_gradient_y(pixel_coord, 1) +
         2.0 * color_gradient_y(pixel_coord, 0) +
         color_gradient_y(pixel_coord, -1);
 
-    let grad = max(length(grad_x), length(grad_y));
+    let grad = max(length(deri_x), length(deri_y));
 
     return f32(grad > ed_uniform.color_threshold);
 }
@@ -235,25 +241,27 @@ fn fragment(
 
     let view_direction = calculate_view(world_position);
     let normal = prepass_normal_unpack(pixel_coord);
-    let fresnel = 1.0 - saturate(dot(normal, view_direction));
-    let steep_angle_adjustment = smoothstep(ed_uniform.steep_angle_threshold, 1.0, fresnel);
+    let fresnel = 1.0 - saturate(dot(normal, view_direction));;
 
     var edge = 0.0;
 
 #ifdef ENABLE_DEPTH
-    edge = max(edge, detect_edge_depth(pixel_coord, steep_angle_adjustment));
+    let edge_depth = detect_edge_depth(pixel_coord, fresnel);
+    edge = max(edge, edge_depth);
 #endif
 
 #ifdef ENABLE_NORMAL
-    edge = max(edge, detect_edge_normal(pixel_coord, steep_angle_adjustment));
+    let edge_normal = detect_edge_normal(pixel_coord);
+    edge = max(edge, edge_normal);
 #endif
 
 #ifdef ENABLE_COLOR
-    edge = max(edge, detect_edge_color(pixel_coord));
+    let edge_color = detect_edge_color(pixel_coord);
+    edge = max(edge, edge_color);
 #endif
 
     var color = textureSample(screen_texture, texture_sampler, in.uv).rgb;
     color = mix(color, ed_uniform.edge_color.rgb, edge);
 
-    return vec4f(vec3f(color), 1.0);
+    return vec4f(color, 1.0);
 }
