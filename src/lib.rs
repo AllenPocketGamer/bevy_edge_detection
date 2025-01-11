@@ -212,7 +212,7 @@ impl SpecializedRenderPipeline for EdgeDetectionPipeline {
             layout: vec![self.bind_group_layout(key.multisampled).clone()],
             vertex: fullscreen_shader_vertex_state(),
             fragment: Some(FragmentState {
-                shader: self.shader.clone(),
+                shader: EDGE_DETECTION_SHADER_HANDLE,
                 shader_defs,
                 entry_point: "fragment".into(),
                 targets,
