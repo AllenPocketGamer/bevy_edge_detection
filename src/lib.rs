@@ -294,6 +294,19 @@ pub struct EdgeDetection {
     /// Areas where the color variation exceeds this threshold will be marked as edges.
     pub color_threshold: f32,
 
+    /// Thickness of the edges detected based on depth variations.
+    /// This value controls the width of the edges drawn when depth-based edge detection is enabled.
+    /// Higher values result in thicker edges.
+    pub depth_thickness: i32,
+    /// Thickness of the edges detected based on normal direction variations.
+    /// This value controls the width of the edges drawn when normal-based edge detection is enabled.
+    /// Higher values result in thicker edges.
+    pub normal_thickness: i32,
+    /// Thickness of the edges detected based on color variations.
+    /// This value controls the width of the edges drawn when color-based edge detection is enabled.
+    /// Higher values result in thicker edges.
+    pub color_thickness: i32,
+
     /// Steep angle threshold, used to adjust the depth threshold when viewing surfaces at steep angles.
     /// When the angle between the view direction and the surface normal is very steep, the depth gradient
     /// can appear artificially large, causing non-edge regions to be mistakenly detected as edges.
@@ -333,10 +346,14 @@ impl Default for EdgeDetection {
             normal_threshold: 0.8,
             color_threshold: 0.1,
 
-            edge_color: Color::BLACK,
+            depth_thickness: 1,
+            normal_thickness: 1,
+            color_thickness: 1,
 
             steep_angle_threshold: 0.0,
             steep_angle_multiplier: 0.15,
+
+            edge_color: Color::BLACK,
 
             enable_depth: true,
             enable_normal: true,
@@ -350,6 +367,11 @@ pub struct EdgeDetectionUniform {
     pub depth_threshold: f32,
     pub normal_threshold: f32,
     pub color_threshold: f32,
+
+    pub depth_thickness: i32,
+    pub normal_thickness: i32,
+    pub color_thickness: i32,
+
     pub steep_angle_threshold: f32,
     pub steep_angle_multiplier: f32,
     pub edge_color: LinearRgba,
@@ -383,8 +405,14 @@ impl From<&EdgeDetection> for EdgeDetectionUniform {
             depth_threshold: ed.depth_threshold,
             normal_threshold: ed.normal_threshold,
             color_threshold: ed.color_threshold,
+
+            depth_thickness: ed.depth_thickness,
+            normal_thickness: ed.normal_thickness,
+            color_thickness: ed.color_thickness,
+
             steep_angle_threshold: ed.steep_angle_threshold,
             steep_angle_multiplier: ed.steep_angle_multiplier,
+
             edge_color: ed.edge_color.into(),
         }
     }

@@ -209,12 +209,18 @@ fn edge_detection_ui(mut ctx: EguiContexts, mut edge_detection: Single<&mut Edge
                 );
             });
 
-            let mut color = edge_detection.edge_color.to_srgba().to_f32_array_no_alpha();
-            ui.horizontal(|ui| {
-                egui::color_picker::color_edit_button_rgb(ui, &mut color);
-                ui.label("edge_color");
-            });
-            edge_detection.edge_color = Color::srgb_from_array(color);
+            ui.add(
+                egui::Slider::new(&mut edge_detection.depth_thickness, 0..=8)
+                    .text("depth_thickness"),
+            );
+            ui.add(
+                egui::Slider::new(&mut edge_detection.normal_thickness, 0..=8)
+                    .text("normal_thickness"),
+            );
+            ui.add(
+                egui::Slider::new(&mut edge_detection.color_thickness, 0..=8)
+                    .text("color_thickness"),
+            );
 
             ui.add(
                 egui::Slider::new(&mut edge_detection.steep_angle_threshold, 0.0..=1.0)
@@ -224,6 +230,13 @@ fn edge_detection_ui(mut ctx: EguiContexts, mut edge_detection: Single<&mut Edge
                 egui::Slider::new(&mut edge_detection.steep_angle_multiplier, 0.0..=1.0)
                     .text("steep_angle_multiplier"),
             );
+
+            let mut color = edge_detection.edge_color.to_srgba().to_f32_array_no_alpha();
+            ui.horizontal(|ui| {
+                egui::color_picker::color_edit_button_rgb(ui, &mut color);
+                ui.label("edge_color");
+            });
+            edge_detection.edge_color = Color::srgb_from_array(color);
         });
     });
 }
