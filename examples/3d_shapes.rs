@@ -5,6 +5,7 @@ use std::f32::consts::PI;
 use bevy::{
     color::palettes::basic::SILVER,
     core_pipeline::{core_3d::graph::Node3d, smaa::Smaa},
+    input::common_conditions::input_toggle_active,
     prelude::*,
     render::{
         render_asset::RenderAssetUsages,
@@ -25,8 +26,14 @@ fn main() {
         })
         .add_plugins(EguiPlugin)
         .add_plugins(PanOrbitCameraPlugin)
-        .add_systems(Startup, setup)
-        .add_systems(Update, (rotate, edge_detection_ui))
+        .add_systems(Startup, (setup, spawn_text))
+        .add_systems(
+            Update,
+            (
+                rotate.run_if(input_toggle_active(false, KeyCode::Space)),
+                edge_detection_ui,
+            ),
+        )
         .run();
 }
 
@@ -135,6 +142,18 @@ fn setup(
         Smaa::default(),
         // to control camera
         PanOrbitCamera::default(),
+    ));
+}
+
+fn spawn_text(mut commands: Commands) {
+    commands.spawn((
+        Text::new("Press Space to turn on/off rotation!"),
+        Node {
+            position_type: PositionType::Absolute,
+            bottom: Val::Px(12.0),
+            left: Val::Px(12.0),
+            ..default()
+        },
     ));
 }
 
