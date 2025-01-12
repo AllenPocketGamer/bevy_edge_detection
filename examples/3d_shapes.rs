@@ -229,15 +229,15 @@ fn edge_detection_ui(mut ctx: EguiContexts, mut edge_detection: Single<&mut Edge
             });
 
             ui.add(
-                egui::Slider::new(&mut edge_detection.depth_thickness, 0..=8)
+                egui::Slider::new(&mut edge_detection.depth_thickness, 0.0..=8.0)
                     .text("depth_thickness"),
             );
             ui.add(
-                egui::Slider::new(&mut edge_detection.normal_thickness, 0..=8)
+                egui::Slider::new(&mut edge_detection.normal_thickness, 0.0..=8.0)
                     .text("normal_thickness"),
             );
             ui.add(
-                egui::Slider::new(&mut edge_detection.color_thickness, 0..=8)
+                egui::Slider::new(&mut edge_detection.color_thickness, 0.0..=8.0)
                     .text("color_thickness"),
             );
 

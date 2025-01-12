@@ -297,15 +297,15 @@ pub struct EdgeDetection {
     /// Thickness of the edges detected based on depth variations.
     /// This value controls the width of the edges drawn when depth-based edge detection is enabled.
     /// Higher values result in thicker edges.
-    pub depth_thickness: i32,
+    pub depth_thickness: f32,
     /// Thickness of the edges detected based on normal direction variations.
     /// This value controls the width of the edges drawn when normal-based edge detection is enabled.
     /// Higher values result in thicker edges.
-    pub normal_thickness: i32,
+    pub normal_thickness: f32,
     /// Thickness of the edges detected based on color variations.
     /// This value controls the width of the edges drawn when color-based edge detection is enabled.
     /// Higher values result in thicker edges.
-    pub color_thickness: i32,
+    pub color_thickness: f32,
 
     /// Steep angle threshold, used to adjust the depth threshold when viewing surfaces at steep angles.
     /// When the angle between the view direction and the surface normal is very steep, the depth gradient
@@ -346,9 +346,9 @@ impl Default for EdgeDetection {
             normal_threshold: 0.8,
             color_threshold: 0.1,
 
-            depth_thickness: 1,
-            normal_thickness: 1,
-            color_thickness: 1,
+            depth_thickness: 1.0,
+            normal_thickness: 1.0,
+            color_thickness: 1.0,
 
             steep_angle_threshold: 0.0,
             steep_angle_multiplier: 0.15,
@@ -368,9 +368,9 @@ pub struct EdgeDetectionUniform {
     pub normal_threshold: f32,
     pub color_threshold: f32,
 
-    pub depth_thickness: i32,
-    pub normal_thickness: i32,
-    pub color_thickness: i32,
+    pub depth_thickness: f32,
+    pub normal_thickness: f32,
+    pub color_thickness: f32,
 
     pub steep_angle_threshold: f32,
     pub steep_angle_multiplier: f32,
