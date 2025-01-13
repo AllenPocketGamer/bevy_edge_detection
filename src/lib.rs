@@ -207,12 +207,18 @@ impl SpecializedRenderPipeline for EdgeDetectionPipeline {
             shader_defs.push("MULTISAMPLED".into());
         }
 
+        match key.projection {
+            ProjectionType::Perspective => shader_defs.push("VIEW_PROJECTION_PERSPECTIVE".into()),
+            ProjectionType::Orthographic => shader_defs.push("VIEW_PROJECTION_ORTHOGRAPHIC".into()),
+            _ => (),
+        };
+
         RenderPipelineDescriptor {
             label: Some("edge_detection: pipeline".into()),
             layout: vec![self.bind_group_layout(key.multisampled).clone()],
             vertex: fullscreen_shader_vertex_state(),
             fragment: Some(FragmentState {
-                shader: EDGE_DETECTION_SHADER_HANDLE,
+                shader: self.shader.clone(),
                 shader_defs,
                 entry_point: "fragment".into(),
                 targets,
@@ -234,9 +240,15 @@ pub fn prepare_edge_detection_pipelines(
     pipeline_cache: Res<PipelineCache>,
     mut pipelines: ResMut<SpecializedRenderPipelines<EdgeDetectionPipeline>>,
     edge_detection_pipeline: Res<EdgeDetectionPipeline>,
-    view_targets: Query<(Entity, &ExtractedView, &EdgeDetection, &Msaa)>,
+    view_targets: Query<(
+        Entity,
+        &ExtractedView,
+        &EdgeDetection,
+        &Msaa,
+        Option<&Projection>,
+    )>,
 ) {
-    for (entity, view, edge_detection, msaa) in view_targets.iter() {
+    for (entity, view, edge_detection, msaa, projection) in view_targets.iter() {
         let (hdr, multisampled) = (view.hdr, *msaa != Msaa::Off);
 
         commands
@@ -244,8 +256,28 @@ pub fn prepare_edge_detection_pipelines(
             .insert(EdgeDetectionPipelineId(pipelines.specialize(
                 &pipeline_cache,
                 &edge_detection_pipeline,
-                EdgeDetectionKey::new(edge_detection, hdr, multisampled),
+                EdgeDetectionKey::new(edge_detection, hdr, multisampled, projection),
             )));
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ProjectionType {
+    None,
+    Perspective,
+    Orthographic,
+}
+
+impl From<Option<&Projection>> for ProjectionType {
+    fn from(proj: Option<&Projection>) -> Self {
+        if let Some(projection) = proj {
+            return match projection {
+                Projection::Perspective(_) => Self::Perspective,
+                Projection::Orthographic(_) => Self::Orthographic,
+            };
+        };
+
+        return Self::None;
     }
 }
 
@@ -265,10 +297,17 @@ pub struct EdgeDetectionKey {
     pub hdr: bool,
     /// Whether the render target is multisampled.
     pub multisampled: bool,
+    /// The projection type of view
+    pub projection: ProjectionType,
 }
 
 impl EdgeDetectionKey {
-    pub fn new(edge_detection: &EdgeDetection, hdr: bool, multisampled: bool) -> Self {
+    pub fn new(
+        edge_detection: &EdgeDetection,
+        hdr: bool,
+        multisampled: bool,
+        projection: Option<&Projection>,
+    ) -> Self {
         Self {
             enable_depth: edge_detection.enable_depth,
             enable_normal: edge_detection.enable_normal,
@@ -276,6 +315,7 @@ impl EdgeDetectionKey {
 
             hdr,
             multisampled,
+            projection: projection.into(),
         }
     }
 }
