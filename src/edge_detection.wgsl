@@ -98,30 +98,30 @@ fn prepass_view_z(uv: vec2f) -> f32 {
     return depth_ndc_to_view_z(depth);
 }
 
-fn view_z_gradient_x(uv: vec2f, y: f32) -> f32 {
-    let l_coord = uv + texel_size * vec2f(-ed_uniform.depth_thickness, y);    // left  coordinate
-    let r_coord = uv + texel_size * vec2f( ed_uniform.depth_thickness, y);    // right coordinate
+fn view_z_gradient_x(uv: vec2f, y: f32, thickness: f32) -> f32 {
+    let l_coord = uv + texel_size * vec2f(-thickness, y);    // left  coordinate
+    let r_coord = uv + texel_size * vec2f( thickness, y);    // right coordinate
 
     return prepass_view_z(r_coord) - prepass_view_z(l_coord); 
 }
 
-fn view_z_gradient_y(uv: vec2f, x: f32) -> f32 {
-    let d_coord = uv + texel_size * vec2f(x, -ed_uniform.depth_thickness);    // down coordinate
-    let t_coord = uv + texel_size * vec2f(x,  ed_uniform.depth_thickness);    // top  coordinate
+fn view_z_gradient_y(uv: vec2f, x: f32, thickness: f32) -> f32 {
+    let d_coord = uv + texel_size * vec2f(x, -thickness);    // down coordinate
+    let t_coord = uv + texel_size * vec2f(x,  thickness);    // top  coordinate
 
     return prepass_view_z(t_coord) - prepass_view_z(d_coord);
 }
 
-fn detect_edge_depth(uv: vec2f, fresnel: f32) -> f32 {
+fn detect_edge_depth(uv: vec2f, thickness: f32, fresnel: f32) -> f32 {
     let deri_x = 
-        view_z_gradient_x(uv, ed_uniform.depth_thickness) +
-        2.0 * view_z_gradient_x(uv, 0.0) +
-        view_z_gradient_x(uv, -ed_uniform.depth_thickness);
+        view_z_gradient_x(uv, thickness, thickness) +
+        2.0 * view_z_gradient_x(uv, 0.0, thickness) +
+        view_z_gradient_x(uv, -thickness, thickness);
 
     let deri_y =
-        view_z_gradient_y(uv, ed_uniform.depth_thickness) +
-        2.0 * view_z_gradient_y(uv, 0.0) +
-        view_z_gradient_y(uv, -ed_uniform.depth_thickness);
+        view_z_gradient_y(uv, thickness, thickness) +
+        2.0 * view_z_gradient_y(uv, 0.0, thickness) +
+        view_z_gradient_y(uv, -thickness, thickness);
 
     // why not `let grad = sqrt(deri_x * deri_x + deri_y * deri_y);`?
     //
@@ -156,30 +156,30 @@ fn prepass_normal(uv: vec2f) -> vec3f {
     return normal.xyz;
 }
 
-fn normal_gradient_x(uv: vec2f, y: f32) -> vec3f {
-    let l_coord = uv + texel_size * vec2f(-ed_uniform.normal_thickness, y);    // left  coordinate
-    let r_coord = uv + texel_size * vec2f( ed_uniform.normal_thickness, y);    // right coordinate
+fn normal_gradient_x(uv: vec2f, y: f32, thickness: f32) -> vec3f {
+    let l_coord = uv + texel_size * vec2f(-thickness, y);    // left  coordinate
+    let r_coord = uv + texel_size * vec2f( thickness, y);    // right coordinate
 
     return prepass_normal(r_coord) - prepass_normal(l_coord);
 }
 
-fn normal_gradient_y(uv: vec2f, x: f32) -> vec3f {
-    let d_coord = uv + texel_size * vec2f(x, -ed_uniform.normal_thickness);    // down coordinate
-    let t_coord = uv + texel_size * vec2f(x,  ed_uniform.normal_thickness);    // top  coordinate
+fn normal_gradient_y(uv: vec2f, x: f32, thickness: f32) -> vec3f {
+    let d_coord = uv + texel_size * vec2f(x, -thickness);    // down coordinate
+    let t_coord = uv + texel_size * vec2f(x,  thickness);    // top  coordinate
 
     return prepass_normal(t_coord) - prepass_normal(d_coord);
 }
 
-fn detect_edge_normal(uv: vec2f) -> f32 {
+fn detect_edge_normal(uv: vec2f, thickness: f32) -> f32 {
     let deri_x = abs(
-        normal_gradient_x(uv,  ed_uniform.normal_thickness) +
-        2.0 * normal_gradient_x(uv,  0.0) +
-        normal_gradient_x(uv, -ed_uniform.normal_thickness));
+        normal_gradient_x(uv,  thickness, thickness) +
+        2.0 * normal_gradient_x(uv,  0.0, thickness) +
+        normal_gradient_x(uv, -thickness, thickness));
 
     let deri_y = abs(
-        normal_gradient_y(uv, ed_uniform.normal_thickness) +
-        2.0 * normal_gradient_y(uv, 0.0) +
-        normal_gradient_y(uv, -ed_uniform.normal_thickness));
+        normal_gradient_y(uv, thickness, thickness) +
+        2.0 * normal_gradient_y(uv, 0.0, thickness) +
+        normal_gradient_y(uv, -thickness, thickness));
 
     let x_max = max(deri_x.x, max(deri_x.y, deri_x.z));
     let y_max = max(deri_y.x, max(deri_y.y, deri_y.z));
@@ -197,30 +197,30 @@ fn prepass_color(uv: vec2f) -> vec3f {
     return textureSample(screen_texture, texture_sampler, uv).rgb;
 }
 
-fn color_gradient_x(uv: vec2f, y: f32) -> vec3f {
-    let l_coord = uv + texel_size * vec2f(-ed_uniform.color_thickness, y);    // left  coordinate
-    let r_coord = uv + texel_size * vec2f( ed_uniform.color_thickness, y);    // right coordinate
+fn color_gradient_x(uv: vec2f, y: f32, thickness: f32) -> vec3f {
+    let l_coord = uv + texel_size * vec2f(-thickness, y);    // left  coordinate
+    let r_coord = uv + texel_size * vec2f( thickness, y);    // right coordinate
 
     return prepass_color(r_coord) - prepass_color(l_coord);
 }
 
-fn color_gradient_y(uv: vec2f, x: f32) -> vec3f {
-    let d_coord = uv + texel_size * vec2f(x, -ed_uniform.color_thickness);    // down coordinate
-    let t_coord = uv + texel_size * vec2f(x,  ed_uniform.color_thickness);    // top  coordinate
+fn color_gradient_y(uv: vec2f, x: f32, thickness: f32) -> vec3f {
+    let d_coord = uv + texel_size * vec2f(x, -thickness);    // down coordinate
+    let t_coord = uv + texel_size * vec2f(x,  thickness);    // top  coordinate
 
     return prepass_color(t_coord) - prepass_color(d_coord);
 }
 
-fn detect_edge_color(uv: vec2f) -> f32 {
+fn detect_edge_color(uv: vec2f, thickness: f32) -> f32 {
     let deri_x = 
-        color_gradient_x(uv,  ed_uniform.color_thickness) +
-        2.0 * color_gradient_x(uv,  0.0) +
-        color_gradient_x(uv, -ed_uniform.color_thickness);
+        color_gradient_x(uv,  thickness, thickness) +
+        2.0 * color_gradient_x(uv,  0.0, thickness) +
+        color_gradient_x(uv, -thickness, thickness);
 
     let deri_y =
-        color_gradient_y(uv, ed_uniform.color_thickness) +
-        2.0 * color_gradient_y(uv, 0.0) +
-        color_gradient_y(uv, -ed_uniform.color_thickness);
+        color_gradient_y(uv,  thickness, thickness) +
+        2.0 * color_gradient_y(uv,  0.0, thickness) +
+        color_gradient_y(uv, -thickness, thickness);
 
     let grad = max(length(deri_x), length(deri_y));
 
@@ -245,27 +245,31 @@ fn fragment(
     texture_size = vec2f(textureDimensions(screen_texture));
     texel_size = 1.0 / texture_size;
 
-    let ndc = vec3f(uv_to_ndc(in.uv), 1.0);
+    // let noise = perlinNoise2(in.uv * vec2f(1280.0, 720.0) / 16.0);
+    // let noise_y = perlinNoise2((in.uv + vec2f(0.5)) * vec2f(1280.0, 720.0) / 16.0);
+    let uv = in.uv;
+
+    let ndc = vec3f(uv_to_ndc(uv), 1.0);
     let world_position = position_ndc_to_world(ndc);
 
     let view_direction = calculate_view(world_position);
-    let normal = prepass_normal_unpack(in.uv);
+    let normal = prepass_normal_unpack(uv);
     let fresnel = 1.0 - saturate(dot(normal, view_direction));;
 
     var edge = 0.0;
 
 #ifdef ENABLE_DEPTH
-    let edge_depth = detect_edge_depth(in.uv, fresnel);
+    let edge_depth = detect_edge_depth(uv, ed_uniform.depth_thickness, fresnel);
     edge = max(edge, edge_depth);
 #endif
 
 #ifdef ENABLE_NORMAL
-    let edge_normal = detect_edge_normal(in.uv);
+    let edge_normal = detect_edge_normal(uv, ed_uniform.normal_thickness);
     edge = max(edge, edge_normal);
 #endif
 
 #ifdef ENABLE_COLOR
-    let edge_color = detect_edge_color(in.uv);
+    let edge_color = detect_edge_color(uv, ed_uniform.color_thickness);
     edge = max(edge, edge_color);
 #endif
 
