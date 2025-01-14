@@ -59,7 +59,7 @@ impl Plugin for EdgeDetectionPlugin {
             Shader::from_wgsl
         );
 
-        embedded_asset!(app, "simplex_noise.png");
+        embedded_asset!(app, "perlin_noise.png");
 
         app.register_type::<EdgeDetection>();
 
@@ -102,6 +102,8 @@ impl Plugin for EdgeDetectionPlugin {
 #[derive(Resource)]
 pub struct EdgeDetectionPipeline {
     pub noise_texture: Handle<Image>,
+    pub linear_sampler: Sampler,
+    pub noise_sampler: Sampler,
     pub layout_with_msaa: BindGroupLayout,
     pub layout_without_msaa: BindGroupLayout,
 }
@@ -120,7 +122,7 @@ impl FromWorld for EdgeDetectionPipeline {
     fn from_world(world: &mut World) -> Self {
         let render_device = world.resource::<RenderDevice>();
 
-        let noise_texture = world.load_asset("embedded://bevy_edge_detection/simplex_noise.png");
+        let noise_texture = world.load_asset("embedded://bevy_edge_detection/perlin_noise.png");
 
         let layout_with_msaa = render_device.create_bind_group_layout(
             "edge_detection: bind_group_layout with msaa",
@@ -134,9 +136,11 @@ impl FromWorld for EdgeDetectionPipeline {
                     texture_depth_2d_multisampled(),
                     // normal prepass
                     texture_2d_multisampled(TextureSampleType::Float { filterable: false }),
-                    // simplex-noise texture
+                    // texture sampler
+                    sampler(SamplerBindingType::Filtering),
+                    // perlin-noise texture
                     texture_2d(TextureSampleType::Float { filterable: true }),
-                    // sampler
+                    // perlin-noise sampler
                     sampler(SamplerBindingType::Filtering),
                     // view
                     uniform_buffer::<ViewUniform>(true),
@@ -158,9 +162,11 @@ impl FromWorld for EdgeDetectionPipeline {
                     texture_depth_2d(),
                     // normal prepass
                     texture_2d(TextureSampleType::Float { filterable: true }),
-                    // simplex-noise texture
+                    // texture sampler
+                    sampler(SamplerBindingType::Filtering),
+                    // perlin-noise texture
                     texture_2d(TextureSampleType::Float { filterable: true }),
-                    // sampler
+                    // perlin-noise sampler
                     sampler(SamplerBindingType::Filtering),
                     // view
                     uniform_buffer::<ViewUniform>(true),
@@ -170,8 +176,26 @@ impl FromWorld for EdgeDetectionPipeline {
             ),
         );
 
+        let linear_sampler = render_device.create_sampler(&SamplerDescriptor {
+            label: Some("edge detection linear sampler"),
+            mag_filter: FilterMode::Linear,
+            min_filter: FilterMode::Linear,
+            ..default()
+        });
+
+        let noise_sampler = render_device.create_sampler(&SamplerDescriptor {
+            label: Some("edge detection noise sampler"),
+            mag_filter: FilterMode::Linear,
+            min_filter: FilterMode::Linear,
+            address_mode_u: AddressMode::Repeat,
+            address_mode_v: AddressMode::Repeat,
+            ..default()
+        });
+
         Self {
             noise_texture,
+            linear_sampler,
+            noise_sampler,
             layout_with_msaa,
             layout_without_msaa,
         }
@@ -555,10 +579,12 @@ impl ViewNode for EdgeDetectionNode {
                 &depth_texture.texture.default_view,
                 // Use normal prepass
                 &normal_texture.texture.default_view,
+                // Use simple texture sampler
+                &edge_detection_pipeline.linear_sampler,
                 // Use noise texture
                 &noise_texture.texture_view,
-                // Use the sampler created for the noise texture
-                &noise_texture.sampler,
+                // Use noise texture sampler
+                &edge_detection_pipeline.noise_sampler,
                 // view uniform binding
                 view_uniforms_binding,
                 // Set the uniform binding

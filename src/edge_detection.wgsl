@@ -22,8 +22,12 @@
 #endif
 
 @group(0) @binding(3) var texture_sampler: sampler;
-@group(0) @binding(4) var<uniform> view: View;
-@group(0) @binding(5) var<uniform> ed_uniform: EdgeDetectionUniform;
+
+@group(0) @binding(4) var noise_texture: texture_2d<f32>;
+@group(0) @binding(5) var noise_sampler: sampler;
+
+@group(0) @binding(6) var<uniform> view: View;
+@group(0) @binding(7) var<uniform> ed_uniform: EdgeDetectionUniform;
 
 struct EdgeDetectionUniform {
     depth_threshold: f32,
@@ -36,6 +40,9 @@ struct EdgeDetectionUniform {
     
     steep_angle_threshold: f32,
     steep_angle_multiplier: f32,
+
+    // xy: distortion frequency; zw: distortion strength
+    uv_distortion: vec4f,
 
     edge_color: vec4f,
 }
@@ -63,8 +70,8 @@ fn depth_ndc_to_view_z(ndc_depth: f32) -> f32 {
 }
 
 /// Convert a ndc space position to world space
-fn position_ndc_to_world(ndc_pos: vec3f) -> vec3f {
-    let world_pos = view.world_from_clip * vec4f(ndc_pos, 1.0);
+fn position_ndc_to_world(ndc_pos: vec3<f32>) -> vec3<f32> {
+    let world_pos = view.world_from_clip * vec4(ndc_pos, 1.0);
     return world_pos.xyz / world_pos.w;
 }
 
@@ -82,13 +89,18 @@ fn calculate_view(world_position: vec3f) -> vec3f {
 // Depth Detection -------
 // -----------------------
 
-fn prepass_view_z(uv: vec2f) -> f32 {
+fn prepass_depth(uv: vec2f) -> f32 {
 #ifdef MULTISAMPLED
     let pixel_coord = vec2i(uv * texture_size);
     let depth = textureLoad(depth_prepass_texture, pixel_coord, sample_index_i);
 #else
     let depth = textureSample(depth_prepass_texture, texture_sampler, uv);
 #endif
+    return depth;
+}
+
+fn prepass_view_z(uv: vec2f) -> f32 {
+    let depth = prepass_depth(uv);
     return depth_ndc_to_view_z(depth);
 }
 
@@ -239,19 +251,22 @@ fn fragment(
     texture_size = vec2f(textureDimensions(screen_texture));
     texel_size = 1.0 / texture_size;
 
-    let uv = in.uv;
+    let near_ndc_pos = vec3f(uv_to_ndc(in.uv), 1.0);
+    let near_world_pos = position_ndc_to_world(near_ndc_pos);
 
-    let ndc = vec3f(uv_to_ndc(uv), 1.0);
-    let world_position = position_ndc_to_world(ndc);
-
-    let view_direction = calculate_view(world_position);
-    let normal = prepass_normal_unpack(uv);
+    let view_direction = calculate_view(near_world_pos);
+    
+    let normal = prepass_normal_unpack(in.uv);
     let fresnel = 1.0 - saturate(dot(normal, view_direction));;
+
+    let sample_uv = in.position.xy * min(texel_size.x, texel_size.y);
+    let noise = textureSample(noise_texture, noise_sampler, sample_uv * ed_uniform.uv_distortion.xy);
+    let uv = in.uv + noise.xy * ed_uniform.uv_distortion.zw;
 
     var edge = 0.0;
 
 #ifdef ENABLE_DEPTH
-    let edge_depth = detect_edge_depth(uv, ed_uniform.depth_thickness + 1.2 * noise, fresnel);
+    let edge_depth = detect_edge_depth(uv, ed_uniform.depth_thickness, fresnel);
     edge = max(edge, edge_depth);
 #endif
 
@@ -269,42 +284,4 @@ fn fragment(
     color = mix(color, ed_uniform.edge_color.rgb, edge);
 
     return vec4f(color, 1.0);
-}
-
-// MIT License. © Stefan Gustavson, Munrocket
-//
-fn permute4(x: vec4f) -> vec4f { return ((x * 34. + 1.) * x) % vec4f(289.); }
-fn fade2(t: vec2f) -> vec2f { return t * t * t * (t * (t * 6. - 15.) + 10.); }
-
-fn perlinNoise2(P: vec2f) -> f32 {
-    var Pi: vec4f = floor(P.xyxy) + vec4f(0., 0., 1., 1.);
-    let Pf = fract(P.xyxy) - vec4f(0., 0., 1., 1.);
-    Pi = Pi % vec4f(289.); // To avoid truncation effects in permutation
-    let ix = Pi.xzxz;
-    let iy = Pi.yyww;
-    let fx = Pf.xzxz;
-    let fy = Pf.yyww;
-    let i = permute4(permute4(ix) + iy);
-    var gx: vec4f = 2. * fract(i * 0.0243902439) - 1.; // 1/41 = 0.024...
-    let gy = abs(gx) - 0.5;
-    let tx = floor(gx + 0.5);
-    gx = gx - tx;
-    var g00: vec2f = vec2f(gx.x, gy.x);
-    var g10: vec2f = vec2f(gx.y, gy.y);
-    var g01: vec2f = vec2f(gx.z, gy.z);
-    var g11: vec2f = vec2f(gx.w, gy.w);
-    let norm = 1.79284291400159 - 0.85373472095314 *
-        vec4f(dot(g00, g00), dot(g01, g01), dot(g10, g10), dot(g11, g11));
-    g00 = g00 * norm.x;
-    g01 = g01 * norm.y;
-    g10 = g10 * norm.z;
-    g11 = g11 * norm.w;
-    let n00 = dot(g00, vec2f(fx.x, fy.x));
-    let n10 = dot(g10, vec2f(fx.y, fy.y));
-    let n01 = dot(g01, vec2f(fx.z, fy.z));
-    let n11 = dot(g11, vec2f(fx.w, fy.w));
-    let fade_xy = fade2(Pf.xy);
-    let n_x = mix(vec2f(n00, n01), vec2f(n10, n11), vec2f(fade_xy.x));
-    let n_xy = mix(n_x.x, n_x.y, fade_xy.y);
-    return 2.3 * n_xy;
 }
