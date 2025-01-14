@@ -391,6 +391,16 @@ pub struct EdgeDetection {
     /// Range: [0.0, inf)
     pub steep_angle_multiplier: f32,
 
+    /// Frequency of UV distortion applied to the edge detection process.
+    /// This controls how often the distortion effect repeats across the UV coordinates.
+    /// Higher values result in more frequent distortion patterns.
+    pub uv_distortion_frequency: Vec2,
+
+    /// Strength of UV distortion applied to the edge detection process.
+    /// This controls the intensity of the distortion effect.
+    /// Higher values result in more pronounced distortion.
+    pub uv_distortion_strength: Vec2,
+
     /// Edge color, used to draw the detected edges.
     /// Typically a high-contrast color (e.g., red or black) to visually highlight the edges.
     pub edge_color: Color,
@@ -417,8 +427,11 @@ impl Default for EdgeDetection {
             normal_thickness: 1.0,
             color_thickness: 1.0,
 
-            steep_angle_threshold: 0.0,
-            steep_angle_multiplier: 0.15,
+            steep_angle_threshold: 0.00,
+            steep_angle_multiplier: 0.30,
+
+            uv_distortion_frequency: Vec2::splat(1.0),
+            uv_distortion_strength: Vec2::splat(0.004),
 
             edge_color: Color::BLACK,
 
@@ -441,6 +454,9 @@ pub struct EdgeDetectionUniform {
 
     pub steep_angle_threshold: f32,
     pub steep_angle_multiplier: f32,
+
+    pub uv_distortion: Vec4,
+
     pub edge_color: LinearRgba,
 }
 
@@ -479,6 +495,13 @@ impl From<&EdgeDetection> for EdgeDetectionUniform {
 
             steep_angle_threshold: ed.steep_angle_threshold,
             steep_angle_multiplier: ed.steep_angle_multiplier,
+
+            uv_distortion: Vec4::new(
+                ed.uv_distortion_frequency.x,
+                ed.uv_distortion_frequency.y,
+                ed.uv_distortion_strength.x,
+                ed.uv_distortion_strength.y,
+            ),
 
             edge_color: ed.edge_color.into(),
         }
