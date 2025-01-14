@@ -1,5 +1,5 @@
 use bevy::{
-    asset::load_internal_asset,
+    asset::{embedded_asset, load_internal_asset},
     core_pipeline::{
         core_3d::{
             graph::{Core3d, Node3d},
@@ -14,6 +14,7 @@ use bevy::{
         extract_component::{
             ComponentUniforms, DynamicUniformIndex, ExtractComponent, UniformComponentPlugin,
         },
+        render_asset::RenderAssets,
         render_graph::{
             NodeRunError, RenderGraphApp, RenderGraphContext, RenderLabel, ViewNode, ViewNodeRunner,
         },
@@ -24,6 +25,7 @@ use bevy::{
         renderer::{RenderContext, RenderDevice},
         sync_component::SyncComponentPlugin,
         sync_world::RenderEntity,
+        texture::GpuImage,
         view::{ExtractedView, ViewTarget, ViewUniform, ViewUniformOffset, ViewUniforms},
         Extract, Render, RenderApp, RenderSet,
     },
@@ -56,6 +58,8 @@ impl Plugin for EdgeDetectionPlugin {
             "edge_detection.wgsl",
             Shader::from_wgsl
         );
+
+        embedded_asset!(app, "simplex_noise.png");
 
         app.register_type::<EdgeDetection>();
 
@@ -97,7 +101,7 @@ impl Plugin for EdgeDetectionPlugin {
 // This contains global data used by the render pipeline. This will be created once on startup.
 #[derive(Resource)]
 pub struct EdgeDetectionPipeline {
-    pub sampler: Sampler,
+    pub noise_texture: Handle<Image>,
     pub layout_with_msaa: BindGroupLayout,
     pub layout_without_msaa: BindGroupLayout,
 }
@@ -116,6 +120,8 @@ impl FromWorld for EdgeDetectionPipeline {
     fn from_world(world: &mut World) -> Self {
         let render_device = world.resource::<RenderDevice>();
 
+        let noise_texture = world.load_asset("embedded://bevy_edge_detection/simplex_noise.png");
+
         let layout_with_msaa = render_device.create_bind_group_layout(
             "edge_detection: bind_group_layout with msaa",
             &BindGroupLayoutEntries::sequential(
@@ -128,6 +134,8 @@ impl FromWorld for EdgeDetectionPipeline {
                     texture_depth_2d_multisampled(),
                     // normal prepass
                     texture_2d_multisampled(TextureSampleType::Float { filterable: false }),
+                    // simplex-noise texture
+                    texture_2d(TextureSampleType::Float { filterable: true }),
                     // sampler
                     sampler(SamplerBindingType::Filtering),
                     // view
@@ -150,6 +158,8 @@ impl FromWorld for EdgeDetectionPipeline {
                     texture_depth_2d(),
                     // normal prepass
                     texture_2d(TextureSampleType::Float { filterable: true }),
+                    // simplex-noise texture
+                    texture_2d(TextureSampleType::Float { filterable: true }),
                     // sampler
                     sampler(SamplerBindingType::Filtering),
                     // view
@@ -160,15 +170,8 @@ impl FromWorld for EdgeDetectionPipeline {
             ),
         );
 
-        // Create the texture sampler.
-        let sampler = render_device.create_sampler(&SamplerDescriptor {
-            label: Some("edge detection sampler"),
-            mag_filter: FilterMode::Linear,
-            min_filter: FilterMode::Linear,
-            ..default()
-        });
         Self {
-            sampler,
+            noise_texture,
             layout_with_msaa,
             layout_without_msaa,
         }
@@ -218,7 +221,7 @@ impl SpecializedRenderPipeline for EdgeDetectionPipeline {
             layout: vec![self.bind_group_layout(key.multisampled).clone()],
             vertex: fullscreen_shader_vertex_state(),
             fragment: Some(FragmentState {
-                shader: self.shader.clone(),
+                shader: EDGE_DETECTION_SHADER_HANDLE,
                 shader_defs,
                 entry_point: "fragment".into(),
                 targets,
@@ -504,6 +507,13 @@ impl ViewNode for EdgeDetectionNode {
             return Ok(());
         };
 
+        let Some(noise_texture) = world
+            .resource::<RenderAssets<GpuImage>>()
+            .get(&edge_detection_pipeline.noise_texture)
+        else {
+            return Ok(());
+        };
+
         let Some(view_uniforms_binding) = world.resource::<ViewUniforms>().uniforms.binding()
         else {
             return Ok(());
@@ -545,8 +555,10 @@ impl ViewNode for EdgeDetectionNode {
                 &depth_texture.texture.default_view,
                 // Use normal prepass
                 &normal_texture.texture.default_view,
-                // Use the sampler created for the pipeline
-                &edge_detection_pipeline.sampler,
+                // Use noise texture
+                &noise_texture.texture_view,
+                // Use the sampler created for the noise texture
+                &noise_texture.sampler,
                 // view uniform binding
                 view_uniforms_binding,
                 // Set the uniform binding
