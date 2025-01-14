@@ -1,5 +1,5 @@
 use bevy::{
-    asset::load_internal_asset,
+    asset::{embedded_asset, load_internal_asset},
     core_pipeline::{
         core_3d::{
             graph::{Core3d, Node3d},
@@ -14,6 +14,7 @@ use bevy::{
         extract_component::{
             ComponentUniforms, DynamicUniformIndex, ExtractComponent, UniformComponentPlugin,
         },
+        render_asset::RenderAssets,
         render_graph::{
             NodeRunError, RenderGraphApp, RenderGraphContext, RenderLabel, ViewNode, ViewNodeRunner,
         },
@@ -24,6 +25,7 @@ use bevy::{
         renderer::{RenderContext, RenderDevice},
         sync_component::SyncComponentPlugin,
         sync_world::RenderEntity,
+        texture::GpuImage,
         view::{ExtractedView, ViewTarget, ViewUniform, ViewUniformOffset, ViewUniforms},
         Extract, Render, RenderApp, RenderSet,
     },
@@ -56,6 +58,8 @@ impl Plugin for EdgeDetectionPlugin {
             "edge_detection.wgsl",
             Shader::from_wgsl
         );
+
+        embedded_asset!(app, "perlin_noise.png");
 
         app.register_type::<EdgeDetection>();
 
@@ -97,7 +101,9 @@ impl Plugin for EdgeDetectionPlugin {
 // This contains global data used by the render pipeline. This will be created once on startup.
 #[derive(Resource)]
 pub struct EdgeDetectionPipeline {
-    pub sampler: Sampler,
+    pub noise_texture: Handle<Image>,
+    pub linear_sampler: Sampler,
+    pub noise_sampler: Sampler,
     pub layout_with_msaa: BindGroupLayout,
     pub layout_without_msaa: BindGroupLayout,
 }
@@ -116,6 +122,8 @@ impl FromWorld for EdgeDetectionPipeline {
     fn from_world(world: &mut World) -> Self {
         let render_device = world.resource::<RenderDevice>();
 
+        let noise_texture = world.load_asset("embedded://bevy_edge_detection/perlin_noise.png");
+
         let layout_with_msaa = render_device.create_bind_group_layout(
             "edge_detection: bind_group_layout with msaa",
             &BindGroupLayoutEntries::sequential(
@@ -128,7 +136,11 @@ impl FromWorld for EdgeDetectionPipeline {
                     texture_depth_2d_multisampled(),
                     // normal prepass
                     texture_2d_multisampled(TextureSampleType::Float { filterable: false }),
-                    // sampler
+                    // texture sampler
+                    sampler(SamplerBindingType::Filtering),
+                    // perlin-noise texture
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    // perlin-noise sampler
                     sampler(SamplerBindingType::Filtering),
                     // view
                     uniform_buffer::<ViewUniform>(true),
@@ -150,7 +162,11 @@ impl FromWorld for EdgeDetectionPipeline {
                     texture_depth_2d(),
                     // normal prepass
                     texture_2d(TextureSampleType::Float { filterable: true }),
-                    // sampler
+                    // texture sampler
+                    sampler(SamplerBindingType::Filtering),
+                    // perlin-noise texture
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    // perlin-noise sampler
                     sampler(SamplerBindingType::Filtering),
                     // view
                     uniform_buffer::<ViewUniform>(true),
@@ -160,15 +176,26 @@ impl FromWorld for EdgeDetectionPipeline {
             ),
         );
 
-        // Create the texture sampler.
-        let sampler = render_device.create_sampler(&SamplerDescriptor {
-            label: Some("edge detection sampler"),
+        let linear_sampler = render_device.create_sampler(&SamplerDescriptor {
+            label: Some("edge detection linear sampler"),
             mag_filter: FilterMode::Linear,
             min_filter: FilterMode::Linear,
             ..default()
         });
+
+        let noise_sampler = render_device.create_sampler(&SamplerDescriptor {
+            label: Some("edge detection noise sampler"),
+            mag_filter: FilterMode::Linear,
+            min_filter: FilterMode::Linear,
+            address_mode_u: AddressMode::Repeat,
+            address_mode_v: AddressMode::Repeat,
+            ..default()
+        });
+
         Self {
-            sampler,
+            noise_texture,
+            linear_sampler,
+            noise_sampler,
             layout_with_msaa,
             layout_without_msaa,
         }
@@ -207,6 +234,12 @@ impl SpecializedRenderPipeline for EdgeDetectionPipeline {
             shader_defs.push("MULTISAMPLED".into());
         }
 
+        match key.projection {
+            ProjectionType::Perspective => shader_defs.push("VIEW_PROJECTION_PERSPECTIVE".into()),
+            ProjectionType::Orthographic => shader_defs.push("VIEW_PROJECTION_ORTHOGRAPHIC".into()),
+            _ => (),
+        };
+
         RenderPipelineDescriptor {
             label: Some("edge_detection: pipeline".into()),
             layout: vec![self.bind_group_layout(key.multisampled).clone()],
@@ -234,9 +267,15 @@ pub fn prepare_edge_detection_pipelines(
     pipeline_cache: Res<PipelineCache>,
     mut pipelines: ResMut<SpecializedRenderPipelines<EdgeDetectionPipeline>>,
     edge_detection_pipeline: Res<EdgeDetectionPipeline>,
-    view_targets: Query<(Entity, &ExtractedView, &EdgeDetection, &Msaa)>,
+    view_targets: Query<(
+        Entity,
+        &ExtractedView,
+        &EdgeDetection,
+        &Msaa,
+        Option<&Projection>,
+    )>,
 ) {
-    for (entity, view, edge_detection, msaa) in view_targets.iter() {
+    for (entity, view, edge_detection, msaa, projection) in view_targets.iter() {
         let (hdr, multisampled) = (view.hdr, *msaa != Msaa::Off);
 
         commands
@@ -244,8 +283,28 @@ pub fn prepare_edge_detection_pipelines(
             .insert(EdgeDetectionPipelineId(pipelines.specialize(
                 &pipeline_cache,
                 &edge_detection_pipeline,
-                EdgeDetectionKey::new(edge_detection, hdr, multisampled),
+                EdgeDetectionKey::new(edge_detection, hdr, multisampled, projection),
             )));
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ProjectionType {
+    None,
+    Perspective,
+    Orthographic,
+}
+
+impl From<Option<&Projection>> for ProjectionType {
+    fn from(proj: Option<&Projection>) -> Self {
+        if let Some(projection) = proj {
+            return match projection {
+                Projection::Perspective(_) => Self::Perspective,
+                Projection::Orthographic(_) => Self::Orthographic,
+            };
+        };
+
+        Self::None
     }
 }
 
@@ -265,10 +324,17 @@ pub struct EdgeDetectionKey {
     pub hdr: bool,
     /// Whether the render target is multisampled.
     pub multisampled: bool,
+    /// The projection type of view
+    pub projection: ProjectionType,
 }
 
 impl EdgeDetectionKey {
-    pub fn new(edge_detection: &EdgeDetection, hdr: bool, multisampled: bool) -> Self {
+    pub fn new(
+        edge_detection: &EdgeDetection,
+        hdr: bool,
+        multisampled: bool,
+        projection: Option<&Projection>,
+    ) -> Self {
         Self {
             enable_depth: edge_detection.enable_depth,
             enable_normal: edge_detection.enable_normal,
@@ -276,6 +342,7 @@ impl EdgeDetectionKey {
 
             hdr,
             multisampled,
+            projection: projection.into(),
         }
     }
 }
@@ -294,6 +361,19 @@ pub struct EdgeDetection {
     /// Areas where the color variation exceeds this threshold will be marked as edges.
     pub color_threshold: f32,
 
+    /// Thickness of the edges detected based on depth variations.
+    /// This value controls the width of the edges drawn when depth-based edge detection is enabled.
+    /// Higher values result in thicker edges.
+    pub depth_thickness: f32,
+    /// Thickness of the edges detected based on normal direction variations.
+    /// This value controls the width of the edges drawn when normal-based edge detection is enabled.
+    /// Higher values result in thicker edges.
+    pub normal_thickness: f32,
+    /// Thickness of the edges detected based on color variations.
+    /// This value controls the width of the edges drawn when color-based edge detection is enabled.
+    /// Higher values result in thicker edges.
+    pub color_thickness: f32,
+
     /// Steep angle threshold, used to adjust the depth threshold when viewing surfaces at steep angles.
     /// When the angle between the view direction and the surface normal is very steep, the depth gradient
     /// can appear artificially large, causing non-edge regions to be mistakenly detected as edges.
@@ -310,6 +390,16 @@ pub struct EdgeDetection {
     ///
     /// Range: [0.0, inf)
     pub steep_angle_multiplier: f32,
+
+    /// Frequency of UV distortion applied to the edge detection process.
+    /// This controls how often the distortion effect repeats across the UV coordinates.
+    /// Higher values result in more frequent distortion patterns.
+    pub uv_distortion_frequency: Vec2,
+
+    /// Strength of UV distortion applied to the edge detection process.
+    /// This controls the intensity of the distortion effect.
+    /// Higher values result in more pronounced distortion.
+    pub uv_distortion_strength: Vec2,
 
     /// Edge color, used to draw the detected edges.
     /// Typically a high-contrast color (e.g., red or black) to visually highlight the edges.
@@ -333,10 +423,17 @@ impl Default for EdgeDetection {
             normal_threshold: 0.8,
             color_threshold: 0.1,
 
-            edge_color: Color::BLACK,
+            depth_thickness: 1.0,
+            normal_thickness: 1.0,
+            color_thickness: 1.0,
 
-            steep_angle_threshold: 0.0,
-            steep_angle_multiplier: 0.15,
+            steep_angle_threshold: 0.00,
+            steep_angle_multiplier: 0.30,
+
+            uv_distortion_frequency: Vec2::splat(1.0),
+            uv_distortion_strength: Vec2::splat(0.004),
+
+            edge_color: Color::BLACK,
 
             enable_depth: true,
             enable_normal: true,
@@ -350,8 +447,16 @@ pub struct EdgeDetectionUniform {
     pub depth_threshold: f32,
     pub normal_threshold: f32,
     pub color_threshold: f32,
+
+    pub depth_thickness: f32,
+    pub normal_thickness: f32,
+    pub color_thickness: f32,
+
     pub steep_angle_threshold: f32,
     pub steep_angle_multiplier: f32,
+
+    pub uv_distortion: Vec4,
+
     pub edge_color: LinearRgba,
 }
 
@@ -383,8 +488,21 @@ impl From<&EdgeDetection> for EdgeDetectionUniform {
             depth_threshold: ed.depth_threshold,
             normal_threshold: ed.normal_threshold,
             color_threshold: ed.color_threshold,
+
+            depth_thickness: ed.depth_thickness,
+            normal_thickness: ed.normal_thickness,
+            color_thickness: ed.color_thickness,
+
             steep_angle_threshold: ed.steep_angle_threshold,
             steep_angle_multiplier: ed.steep_angle_multiplier,
+
+            uv_distortion: Vec4::new(
+                ed.uv_distortion_frequency.x,
+                ed.uv_distortion_frequency.y,
+                ed.uv_distortion_strength.x,
+                ed.uv_distortion_strength.y,
+            ),
+
             edge_color: ed.edge_color.into(),
         }
     }
@@ -436,6 +554,13 @@ impl ViewNode for EdgeDetectionNode {
             return Ok(());
         };
 
+        let Some(noise_texture) = world
+            .resource::<RenderAssets<GpuImage>>()
+            .get(&edge_detection_pipeline.noise_texture)
+        else {
+            return Ok(());
+        };
+
         let Some(view_uniforms_binding) = world.resource::<ViewUniforms>().uniforms.binding()
         else {
             return Ok(());
@@ -477,8 +602,12 @@ impl ViewNode for EdgeDetectionNode {
                 &depth_texture.texture.default_view,
                 // Use normal prepass
                 &normal_texture.texture.default_view,
-                // Use the sampler created for the pipeline
-                &edge_detection_pipeline.sampler,
+                // Use simple texture sampler
+                &edge_detection_pipeline.linear_sampler,
+                // Use noise texture
+                &noise_texture.texture_view,
+                // Use noise texture sampler
+                &edge_detection_pipeline.noise_sampler,
                 // view uniform binding
                 view_uniforms_binding,
                 // Set the uniform binding
