@@ -304,7 +304,7 @@ impl From<Option<&Projection>> for ProjectionType {
             };
         };
 
-        return Self::None;
+        Self::None
     }
 }
 

@@ -251,14 +251,28 @@ fn edge_detection_ui(mut ctx: EguiContexts, mut edge_detection: Single<&mut Edge
             );
 
             ui.horizontal(|ui| {
-                ui.add(egui::DragValue::new(&mut edge_detection.uv_distortion_frequency.x).range(0.0..=16.0));
-                ui.add(egui::DragValue::new(&mut edge_detection.uv_distortion_frequency.y).range(0.0..=16.0));
+                ui.add(
+                    egui::DragValue::new(&mut edge_detection.uv_distortion_frequency.x)
+                        .range(0.0..=16.0),
+                );
+                ui.add(
+                    egui::DragValue::new(&mut edge_detection.uv_distortion_frequency.y)
+                        .range(0.0..=16.0),
+                );
                 ui.label("uv_distortion_frequency");
             });
 
             ui.horizontal(|ui| {
-                ui.add(egui::DragValue::new(&mut edge_detection.uv_distortion_strength.x).range(0.0..=1.0).fixed_decimals(4));
-                ui.add(egui::DragValue::new(&mut edge_detection.uv_distortion_strength.y).range(0.0..=1.0).fixed_decimals(4));
+                ui.add(
+                    egui::DragValue::new(&mut edge_detection.uv_distortion_strength.x)
+                        .range(0.0..=1.0)
+                        .fixed_decimals(4),
+                );
+                ui.add(
+                    egui::DragValue::new(&mut edge_detection.uv_distortion_strength.y)
+                        .range(0.0..=1.0)
+                        .fixed_decimals(4),
+                );
                 ui.label("uv_distortion_strength");
             });
 
