@@ -1,5 +1,5 @@
 use bevy::{
-    asset::{embedded_asset, load_internal_asset},
+    asset::embedded_asset,
     core_pipeline::{
         core_3d::{
             graph::{Core3d, Node3d},
@@ -34,9 +34,6 @@ use binding_types::{
     sampler, texture_2d_multisampled, texture_depth_2d, texture_depth_2d_multisampled,
 };
 
-pub const EDGE_DETECTION_SHADER_HANDLE: Handle<Shader> =
-    Handle::weak_from_u128(98765432109876543210987654321098765);
-
 /// An edge detection post-processing plugin based on the sobel filter.
 pub struct EdgeDetectionPlugin {
     pub before: Node3d,
@@ -52,14 +49,8 @@ impl Default for EdgeDetectionPlugin {
 
 impl Plugin for EdgeDetectionPlugin {
     fn build(&self, app: &mut App) {
-        load_internal_asset!(
-            app,
-            EDGE_DETECTION_SHADER_HANDLE,
-            "edge_detection.wgsl",
-            Shader::from_wgsl
-        );
-
         embedded_asset!(app, "perlin_noise.png");
+        embedded_asset!(app, "edge_detection.wgsl");
 
         app.register_type::<EdgeDetection>();
 
@@ -101,6 +92,7 @@ impl Plugin for EdgeDetectionPlugin {
 // This contains global data used by the render pipeline. This will be created once on startup.
 #[derive(Resource)]
 pub struct EdgeDetectionPipeline {
+    pub shader_handle: Handle<Shader>,
     pub noise_texture: Handle<Image>,
     pub linear_sampler: Sampler,
     pub noise_sampler: Sampler,
@@ -122,6 +114,7 @@ impl FromWorld for EdgeDetectionPipeline {
     fn from_world(world: &mut World) -> Self {
         let render_device = world.resource::<RenderDevice>();
 
+        let shader_handle = world.load_asset("embedded://bevy_edge_detection/edge_detection.wgsl");
         let noise_texture = world.load_asset("embedded://bevy_edge_detection/perlin_noise.png");
 
         let layout_with_msaa = render_device.create_bind_group_layout(
@@ -193,6 +186,7 @@ impl FromWorld for EdgeDetectionPipeline {
         });
 
         Self {
+            shader_handle,
             noise_texture,
             linear_sampler,
             noise_sampler,
@@ -245,7 +239,7 @@ impl SpecializedRenderPipeline for EdgeDetectionPipeline {
             layout: vec![self.bind_group_layout(key.multisampled).clone()],
             vertex: fullscreen_shader_vertex_state(),
             fragment: Some(FragmentState {
-                shader: EDGE_DETECTION_SHADER_HANDLE,
+                shader: self.shader_handle.clone(),
                 shader_defs,
                 entry_point: "fragment".into(),
                 targets,
