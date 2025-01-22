@@ -2,15 +2,9 @@
 
 `bevy_edge_detection` is a Bevy plugin that provides edge detection post-processing using a 3x3 Sobel filter. This plugin is designed to enhance your Bevy projects by adding visually distinct edges to your 3D scenes, making them more stylized or easier to analyze.
 
-![3d_shapes](./3d_shapes.png)
+![simple](./example_simple.png)
 
-## Features
-
-* __Edge Detection__: Utilizes a 3x3 Sobel filter to detect edges based on depth, normal, and color variations.
-
-* __Customizable Thresholds__: Adjustable thresholds for depth, normal, and color to fine-tune edge detection.
-
-* __Post-Processing Integration__: Seamlessly integrates with Bevy's post-processing pipeline.
+![example_3d_shapes](./example_3d_shapes.png)
 
 ## Usage
 
@@ -18,7 +12,7 @@
 
 ```rust
 [dependencies]
-bevy_edge_detection = "0.15.1"
+bevy_edge_detection = "0.15.5"
 ```
 
 1. Add the EdgeDetectionPlugin to your Bevy app:

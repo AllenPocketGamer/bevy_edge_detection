@@ -276,12 +276,12 @@ fn edge_detection_ui(mut ctx: EguiContexts, mut edge_detection: Single<&mut Edge
                 ui.label("uv_distortion_strength");
             });
 
-            let mut color = edge_detection.edge_color.to_srgba().to_f32_array_no_alpha();
+            let mut color = edge_detection.edge_color.to_srgba().to_u8_array_no_alpha();
             ui.horizontal(|ui| {
-                egui::color_picker::color_edit_button_rgb(ui, &mut color);
+                egui::color_picker::color_edit_button_srgb(ui, &mut color);
                 ui.label("edge_color");
             });
-            edge_detection.edge_color = Color::srgb_from_array(color);
+            edge_detection.edge_color = Color::srgb_u8(color[0], color[1], color[2]);
         });
     });
 }
